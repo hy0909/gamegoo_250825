@@ -5,68 +5,68 @@ import RadarChart from './RadarChart'
 
 // 롤BTI 질문 데이터 (9가지 질문)
 const rollBtiQuestions = [
-  {
-    id: 1,
-    question: "블리츠크랭크가 인베 가자고 하면?",
-    optionA: "무조건 따라감",
-    optionB: "가볍게 무시",
-    axis: 'EI' // 전투 참여도
+  { 
+    id: 1, 
+    question: "블리츠크랭크가 인베 가자고 하면?", 
+    optionA: "무조건 따라감", 
+    optionB: "가볍게 무시", 
+    axis: 'EI' 
   },
-  {
-    id: 2,
-    question: "게임 초반 운영은?",
-    optionA: "초반 압박으로 굴린다",
-    optionB: "안전하게 성장",
-    axis: 'SP' // 운영 스타일
+  { 
+    id: 2, 
+    question: "게임 초반 운영은?", 
+    optionA: "초반 압박으로 굴린다", 
+    optionB: "안전하게 성장", 
+    axis: 'SP' 
   },
-  {
-    id: 3,
-    question: "초반 킬각이 보이면?",
-    optionA: "무조건 싸운다",
-    optionB: "안정적으로 간다",
-    axis: 'SP' // 운영 스타일
+  { 
+    id: 3, 
+    question: "초반 킬각이 보이면?", 
+    optionA: "무조건 싸운다", 
+    optionB: "안정적으로 간다", 
+    axis: 'SP' 
   },
-  {
-    id: 4,
-    question: "블루 버프를 먹고 싶은 원딜(혹은 다른 팀원)이 있다면?",
-    optionA: "이미 내가 먹었다",
-    optionB: "양보한다",
-    axis: 'GC' // 자원 사용 방식
+  { 
+    id: 4, 
+    question: "블루 버프를 먹고 싶은 다른 팀원이 있다면?", 
+    optionA: "이미 내가 먹었다", 
+    optionB: "양보한다", 
+    axis: 'GC' 
   },
-  {
-    id: 5,
-    question: "용 한타/바론 한타 콜이 오면?",
-    optionA: "무조건 달려간다",
-    optionB: "라인 클리어부터 한다",
-    axis: 'EI' // 전투 참여도
+  { 
+    id: 5, 
+    question: "용/바론 한타 콜이 오면?", 
+    optionA: "무조건 달려간다", 
+    optionB: "라인 클리어부터 한다", 
+    axis: 'EI' 
   },
-  {
-    id: 6,
-    question: "한타 중, 적 딜러가 눈앞에 있다면?",
-    optionA: "즉시 진입",
-    optionB: "포지션 유지",
-    axis: 'EI' // 전투 참여도
+  { 
+    id: 6, 
+    question: "한타 중, 적 딜러가 눈앞에 있다면?", 
+    optionA: "즉시 진입", 
+    optionB: "포지션 유지", 
+    axis: 'EI' 
   },
-  {
-    id: 7,
-    question: "내가 0/3/0 이 되었을 때?",
-    optionA: "침착하게 플레이",
-    optionB: "멘탈 흔들려 과감한 플레이",
-    axis: 'TM' // 멘탈 안정성
+  { 
+    id: 7, 
+    question: "내가 0/3/0 이 되었을 때?", 
+    optionA: "침착하고 안정적으로 플레이", 
+    optionB: "역전을 노린다, 과감한 플레이", 
+    axis: 'TM' 
   },
-  {
-    id: 8,
-    question: "연패 중일 때 나는?",
-    optionA: "큐 돌려!",
-    optionB: "쉬었다 한다",
-    axis: 'TM' // 멘탈 안정성
+  { 
+    id: 8, 
+    question: "연패 중일 때 나는?", 
+    optionA: "큐 돌려!", 
+    optionB: "쉬었다 한다", 
+    axis: 'TM' 
   },
-  {
-    id: 9,
-    question: "제어 와드 막타는?",
-    optionA: "팀원에게 양보한다",
-    optionB: "내가 먹는다",
-    axis: 'GC' // 자원 사용 방식
+  { 
+    id: 9, 
+    question: "제어와드 막타는?", 
+    optionA: "팀원에게 양보한다", 
+    optionB: "내가 먹는다", 
+    axis: 'GC' 
   }
 ]
 
