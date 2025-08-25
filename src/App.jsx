@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { supabase, generateSessionId, getUtmParams } from './supabase'
 
 // 롤BTI 질문 데이터 (9가지 질문)
 const rollBtiQuestions = [
@@ -254,32 +255,133 @@ function App() {
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
+  const [sessionId, setSessionId] = useState('')
+  const [utmParams, setUtmParams] = useState({})
 
-  // URL 파라미터에서 결과 확인
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const resultType = urlParams.get('result')
+    // 세션 ID 생성
+    const newSessionId = generateSessionId()
+    setSessionId(newSessionId)
     
-    if (resultType && rollBtiResults[resultType]) {
-      setResult(rollBtiResults[resultType])
-      setCurrentPage('result')
+    // UTM 파라미터 추출
+    const utm = getUtmParams()
+    setUtmParams(utm)
+    
+    // URL 파라미터로 결과 페이지 직접 접근 처리
+    const urlParams = new URLSearchParams(window.location.search)
+    const resultParam = urlParams.get('result')
+    
+    if (resultParam && resultParam.length === 4) {
+      const resultData = rollBtiResults[resultParam]
+      if (resultData) {
+        setResult(resultData)
+        setCurrentPage('result')
+        // 결과 페이지 방문 로그
+        logPageVisit('result', null, resultParam)
+      }
+    } else {
+      // 메인 페이지 방문 로그
+      logPageVisit('main')
     }
   }, [])
+
+  // 페이지 방문 로그 함수
+  const logPageVisit = async (pageType, questionNumber = null, resultType = null) => {
+    try {
+      const { data, error } = await supabase
+        .from('page_visits')
+        .insert([
+          {
+            session_id: sessionId,
+            page_type: pageType,
+            question_number: questionNumber,
+            referrer: utmParams.referrer,
+            utm_source: utmParams.utm_source,
+            utm_medium: utmParams.utm_medium,
+            utm_campaign: utmParams.utm_campaign,
+            user_agent: navigator.userAgent
+          }
+        ])
+      
+      if (error) console.error('페이지 방문 로그 오류:', error)
+    } catch (error) {
+      console.error('페이지 방문 로그 저장 실패:', error)
+    }
+  }
+
+  // 테스트 결과 저장 함수
+  const saveTestResult = async (resultType, resultTitle, userAnswers) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_test_results')
+        .insert([
+          {
+            session_id: sessionId,
+            result_type: resultType,
+            result_title: resultTitle,
+            answers: userAnswers,
+            share_button_clicked: false,
+            test_restarted: false,
+            referrer: utmParams.referrer,
+            utm_source: utmParams.utm_source,
+            utm_medium: utmParams.utm_medium,
+            utm_campaign: utmParams.utm_campaign,
+            user_agent: navigator.userAgent
+          }
+        ])
+      
+      if (error) console.error('테스트 결과 저장 오류:', error)
+    } catch (error) {
+      console.error('테스트 결과 저장 실패:', error)
+    }
+  }
+
+  // 공유 버튼 클릭 로그
+  const logShareButtonClick = async () => {
+    try {
+      const { error } = await supabase
+        .from('user_test_results')
+        .update({ share_button_clicked: true })
+        .eq('session_id', sessionId)
+      
+      if (error) console.error('공유 버튼 클릭 로그 오류:', error)
+    } catch (error) {
+      console.error('공유 버튼 클릭 로그 저장 실패:', error)
+    }
+  }
+
+  // 테스트 재시작 로그
+  const logTestRestart = async () => {
+    try {
+      const { error } = await supabase
+        .from('user_test_results')
+        .update({ test_restarted: true })
+        .eq('session_id', sessionId)
+      
+      if (error) console.error('테스트 재시작 로그 오류:', error)
+    } catch (error) {
+      console.error('테스트 재시작 로그 저장 실패:', error)
+    }
+  }
 
   const startTest = () => {
     setCurrentPage('question')
     setCurrentQuestion(0)
     setAnswers([])
-    // URL에서 결과 파라미터 제거
-    window.history.replaceState({}, document.title, window.location.pathname)
+    setResult(null)
+    // 질문 페이지 방문 로그
+    logPageVisit('question', 1)
   }
 
   const selectAnswer = (answer) => {
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
     
+    // 질문 페이지 방문 로그
+    logPageVisit('question', currentQuestion + 2)
+    
     if (newAnswers.length === rollBtiQuestions.length) {
-      // 결과 계산 - 각 질문의 축에 따라 결과 결정
+      // 결과 계산 로직
       let resultType = ''
       
       // E/I 축 (전투 참여도) - 질문 1, 5, 6
@@ -287,35 +389,42 @@ function App() {
       const eCount = eiAnswers.filter(ans => ans === 'A').length
       const iCount = eiAnswers.filter(ans => ans === 'B').length
       resultType += eCount > iCount ? 'E' : 'I'
-      
+
       // G/C 축 (자원 사용 방식) - 질문 4, 9
       const gcAnswers = [newAnswers[3], newAnswers[8]]
       const gCount = gcAnswers.filter(ans => ans === 'A').length
       const cCount = gcAnswers.filter(ans => ans === 'B').length
       resultType += gCount > cCount ? 'G' : 'C'
-      
+
       // P/S 축 (운영 스타일) - 질문 2, 3
       const psAnswers = [newAnswers[1], newAnswers[2]]
       const pCount = psAnswers.filter(ans => ans === 'B').length
       const sCount = psAnswers.filter(ans => ans === 'A').length
       resultType += pCount > sCount ? 'P' : 'S'
-      
+
       // T/M 축 (멘탈 안정성) - 질문 7, 8
       const tmAnswers = [newAnswers[6], newAnswers[7]]
       const tCount = tmAnswers.filter(ans => ans === 'A').length
       const mCount = tmAnswers.filter(ans => ans === 'B').length
       resultType += tCount > mCount ? 'T' : 'M'
-      
-      console.log('결과 계산:', { resultType, newAnswers, eiAnswers, gcAnswers, psAnswers, tmAnswers })
-      
+
+      console.log('결과 타입:', resultType)
+      console.log('선택한 답변:', newAnswers)
+
       const resultData = rollBtiResults[resultType]
       if (resultData) {
         setResult(resultData)
         setCurrentPage('result')
-        // URL에 결과 파라미터 추가
-        window.history.pushState({}, document.title, `?result=${resultType}`)
+        
+        // URL 업데이트
+        window.history.pushState({}, '', `?result=${resultType}`)
+        
+        // 테스트 결과 저장
+        saveTestResult(resultType, resultData.title, newAnswers)
+        
+        // 결과 페이지 방문 로그
+        logPageVisit('result', null, resultType)
       } else {
-        console.error('결과를 찾을 수 없습니다:', resultType)
         alert('결과를 찾을 수 없습니다. 다시 시도해주세요.')
       }
     } else {
@@ -324,37 +433,53 @@ function App() {
   }
 
   const restartTest = () => {
+    // 테스트 재시작 로그
+    logTestRestart()
+    
     setCurrentPage('main')
     setCurrentQuestion(0)
     setAnswers([])
     setResult(null)
     setShareMessage('')
-    // URL에서 결과 파라미터 제거
-    window.history.replaceState({}, document.title, window.location.pathname)
+    
+    // URL 파라미터 제거
+    window.history.pushState({}, '', '/')
+    
+    // 메인 페이지 방문 로그
+    logPageVisit('main')
   }
 
   const shareResult = async () => {
-    const currentUrl = window.location.href
+    // UTM 파라미터가 포함된 공유 링크 생성
+    const baseUrl = window.location.origin + window.location.pathname
+    const resultParam = `?result=${result.type}`
+    const utmParams = `&utm_source=share&utm_medium=copy&utm_campaign=result`
+    const shareUrl = baseUrl + resultParam + utmParams
     
     try {
-      // 클립보드에 복사
-      await navigator.clipboard.writeText(currentUrl)
+      await navigator.clipboard.writeText(shareUrl)
       setShareMessage('링크가 복사되었습니다!')
       
-      // 3초 후 메시지 제거
+      // 공유 버튼 클릭 로그
+      logShareButtonClick()
+      
       setTimeout(() => {
         setShareMessage('')
       }, 3000)
     } catch (err) {
-      // 클립보드 API가 지원되지 않는 경우 fallback
+      // 클립보드 API를 지원하지 않는 경우
       const textArea = document.createElement('textarea')
-      textArea.value = currentUrl
+      textArea.value = shareUrl
       document.body.appendChild(textArea)
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
       
       setShareMessage('링크가 복사되었습니다!')
+      
+      // 공유 버튼 클릭 로그
+      logShareButtonClick()
+      
       setTimeout(() => {
         setShareMessage('')
       }, 3000)
