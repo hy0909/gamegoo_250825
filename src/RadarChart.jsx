@@ -83,15 +83,17 @@ const RadarChart = ({ answers }) => {
           scores.tScore,
           scores.mScore
         ],
-        backgroundColor: 'rgba(0, 255, 136, 0.2)',
-        borderColor: 'rgba(0, 255, 136, 1)',
-        borderWidth: 3,
-        pointBackgroundColor: 'rgba(0, 255, 136, 1)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(0, 255, 136, 1)',
-        pointRadius: 6,
-        pointHoverRadius: 8
+        backgroundColor: 'rgba(0, 255, 136, 0.15)',
+        borderColor: 'rgba(0, 255, 136, 0.8)',
+        borderWidth: 2.5,
+        pointBackgroundColor: 'rgba(0, 255, 136, 0.9)',
+        pointBorderColor: 'rgba(0, 255, 136, 1)',
+        pointHoverBackgroundColor: 'rgba(0, 255, 136, 1)',
+        pointHoverBorderColor: '#ffffff',
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBorderWidth: 1,
+        fill: true
       }
     ]
   }
@@ -105,26 +107,24 @@ const RadarChart = ({ answers }) => {
         max: 100,
         min: 0,
         ticks: {
-          display: false,
-          stepSize: 33.33,
-          callback: function(value, index, values) {
-            // 0, 33.33, 66.66, 100만 표시 (4개 선이지만 3개 간격)
-            return value % 33.33 === 0 ? value : '';
-          }
+          display: false
         },
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-          circular: true
+          color: 'rgba(255, 255, 255, 0.08)',
+          circular: true,
+          lineWidth: 1
         },
         angleLines: {
-          color: 'rgba(255, 255, 255, 0.1)'
+          color: 'rgba(255, 255, 255, 0.08)',
+          lineWidth: 1
         },
         pointLabels: {
           color: '#ffffff',
           font: {
-            size: 14,
-            weight: '600'
-          }
+            size: 13,
+            weight: '500'
+          },
+          padding: 15
         }
       }
     },
@@ -133,16 +133,24 @@ const RadarChart = ({ answers }) => {
         display: false
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
         titleColor: '#ffffff',
         bodyColor: '#ffffff',
-        borderColor: 'rgba(0, 255, 136, 1)',
+        borderColor: 'rgba(0, 255, 136, 0.8)',
         borderWidth: 1,
+        cornerRadius: 8,
+        displayColors: false,
         callbacks: {
           label: function(context) {
             return `${context.label}: ${context.parsed.r}점`
           }
         }
+      }
+    },
+    elements: {
+      point: {
+        hoverRadius: 5,
+        radius: 3
       }
     }
   }

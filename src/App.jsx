@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-// import { supabase, generateSessionId, getUtmParams } from './supabase'
+import { supabase, generateSessionId, getUtmParams } from './supabase'
 import RadarChart from './RadarChart'
 
 // 롤BTI 질문 데이터 (9가지 질문)
@@ -261,12 +261,12 @@ function App() {
 
   useEffect(() => {
     // 세션 ID 생성
-    // const newSessionId = generateSessionId()
-    // setSessionId(newSessionId)
+    const newSessionId = generateSessionId()
+    setSessionId(newSessionId)
     
     // UTM 파라미터 추출
-    // const utm = getUtmParams()
-    // setUtmParams(utm)
+    const utm = getUtmParams()
+    setUtmParams(utm)
     
     // URL 파라미터로 결과 페이지 직접 접근 처리
     const urlParams = new URLSearchParams(window.location.search)
@@ -278,33 +278,33 @@ function App() {
         setResult(resultData)
         setCurrentPage('result')
         // 결과 페이지 방문 로그
-        // logPageVisit('result', null, resultParam)
+        logPageVisit('result', null, resultParam)
       }
     } else {
       // 메인 페이지 방문 로그
-      // logPageVisit('main')
+      logPageVisit('main')
     }
   }, [])
 
   // 페이지 방문 로그 함수
   const logPageVisit = async (pageType, questionNumber = null, resultType = null) => {
     try {
-      // const { data, error } = await supabase
-      //   .from('page_visits')
-      //   .insert([
-      //     {
-      //       session_id: sessionId,
-      //       page_type: pageType,
-      //       question_number: questionNumber,
-      //       referrer: utmParams.referrer,
-      //       utm_source: utmParams.utm_source,
-      //       utm_medium: utmParams.utm_medium,
-      //       utm_campaign: utmParams.utm_campaign,
-      //       user_agent: navigator.userAgent
-      //     }
-      //   ])
+      const { data, error } = await supabase
+        .from('page_visits')
+        .insert([
+          {
+            session_id: sessionId,
+            page_type: pageType,
+            question_number: questionNumber,
+            referrer: utmParams.referrer,
+            utm_source: utmParams.utm_source,
+            utm_medium: utmParams.utm_medium,
+            utm_campaign: utmParams.utm_campaign,
+            user_agent: navigator.userAgent
+          }
+        ])
       
-      // if (error) console.error('페이지 방문 로그 오류:', error)
+      if (error) console.error('페이지 방문 로그 오류:', error)
     } catch (error) {
       console.error('페이지 방문 로그 저장 실패:', error)
     }
@@ -313,25 +313,25 @@ function App() {
   // 테스트 결과 저장 함수
   const saveTestResult = async (resultType, resultTitle, userAnswers) => {
     try {
-      // const { data, error } = await supabase
-      //   .from('user_test_results')
-      //   .insert([
-      //     {
-      //       session_id: sessionId,
-      //       result_type: resultType,
-      //       result_title: resultTitle,
-      //       answers: userAnswers,
-      //       share_button_clicked: false,
-      //       test_restarted: false,
-      //       referrer: utmParams.referrer,
-      //       utm_source: utmParams.utm_source,
-      //       utm_medium: utmParams.utm_medium,
-      //       utm_campaign: utmParams.utm_campaign,
-      //       user_agent: navigator.userAgent
-      //     }
-      //   ])
+      const { data, error } = await supabase
+        .from('user_test_results')
+        .insert([
+          {
+            session_id: sessionId,
+            result_type: resultType,
+            result_title: resultTitle,
+            answers: userAnswers,
+            share_button_clicked: false,
+            test_restarted: false,
+            referrer: utmParams.referrer,
+            utm_source: utmParams.utm_source,
+            utm_medium: utmParams.utm_medium,
+            utm_campaign: utmParams.utm_campaign,
+            user_agent: navigator.userAgent
+          }
+        ])
       
-      // if (error) console.error('테스트 결과 저장 오류:', error)
+      if (error) console.error('테스트 결과 저장 오류:', error)
     } catch (error) {
       console.error('테스트 결과 저장 실패:', error)
     }
@@ -340,12 +340,12 @@ function App() {
   // 공유 버튼 클릭 로그
   const logShareButtonClick = async () => {
     try {
-      // const { error } = await supabase
-      //   .from('user_test_results')
-      //   .update({ share_button_clicked: true })
-      //   .eq('session_id', sessionId)
+      const { error } = await supabase
+        .from('user_test_results')
+        .update({ share_button_clicked: true })
+        .eq('session_id', sessionId)
       
-      // if (error) console.error('공유 버튼 클릭 로그 오류:', error)
+      if (error) console.error('공유 버튼 클릭 로그 오류:', error)
     } catch (error) {
       console.error('공유 버튼 클릭 로그 저장 실패:', error)
     }
@@ -354,12 +354,12 @@ function App() {
   // 테스트 재시작 로그
   const logTestRestart = async () => {
     try {
-      // const { error } = await supabase
-      //   .from('user_test_results')
-      //   .update({ test_restarted: true })
-      //   .eq('session_id', sessionId)
+      const { error } = await supabase
+        .from('user_test_results')
+        .update({ test_restarted: true })
+        .eq('session_id', sessionId)
       
-      // if (error) console.error('테스트 재시작 로그 오류:', error)
+      if (error) console.error('테스트 재시작 로그 오류:', error)
     } catch (error) {
       console.error('테스트 재시작 로그 저장 실패:', error)
     }
@@ -371,7 +371,7 @@ function App() {
     setAnswers([])
     setResult(null)
     // 질문 페이지 방문 로그
-    // logPageVisit('question', 1)
+    logPageVisit('question', 1)
   }
 
   const selectAnswer = (answer) => {
@@ -379,7 +379,7 @@ function App() {
     setAnswers(newAnswers)
     
     // 질문 페이지 방문 로그
-    // logPageVisit('question', currentQuestion + 2)
+    logPageVisit('question', currentQuestion + 2)
     
     if (newAnswers.length === rollBtiQuestions.length) {
       // 결과 계산 로직
@@ -421,10 +421,10 @@ function App() {
         window.history.pushState({}, '', `?result=${resultType}`)
         
         // 테스트 결과 저장
-        // saveTestResult(resultType, resultData.title, newAnswers)
+        saveTestResult(resultType, resultData.title, newAnswers)
         
         // 결과 페이지 방문 로그
-        // logPageVisit('result', null, resultType)
+        logPageVisit('result', null, resultType)
       } else {
         alert('결과를 찾을 수 없습니다. 다시 시도해주세요.')
       }
@@ -435,7 +435,7 @@ function App() {
 
   const restartTest = () => {
     // 테스트 재시작 로그
-    // logTestRestart()
+    logTestRestart()
     
     setCurrentPage('main')
     setCurrentQuestion(0)
@@ -447,7 +447,7 @@ function App() {
     window.history.pushState({}, '', '/')
     
     // 메인 페이지 방문 로그
-    // logPageVisit('main')
+    logPageVisit('main')
   }
 
   const shareResult = async () => {
@@ -462,7 +462,7 @@ function App() {
       setShareMessage('링크가 복사되었습니다!')
       
       // 공유 버튼 클릭 로그
-      // logShareButtonClick()
+      logShareButtonClick()
       
       setTimeout(() => {
         setShareMessage('')
@@ -479,7 +479,7 @@ function App() {
       setShareMessage('링크가 복사되었습니다!')
       
       // 공유 버튼 클릭 로그
-      // logShareButtonClick()
+      logShareButtonClick()
       
       setTimeout(() => {
         setShareMessage('')
