@@ -297,18 +297,25 @@ function App() {
     }
   }, [])
 
-  // 참여자 수 보호 useEffect (추가 보호)
+  // 참여자 수 보호 useEffect (0은 절대 허용하지 않음)
   useEffect(() => {
-    // 참여자 수가 0이 되면 강제로 복구
-    if (participantCount === 0) {
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      if (savedCount && parseInt(savedCount) > 0) {
-        const count = parseInt(savedCount)
-        console.log('🚨 참여자 수 0 감지, 강제 복구:', count)
-        setParticipantCount(count)
-      }
+    // 참여자 수가 0 이하면 즉시 4로 강제 변경
+    if (participantCount <= 0) {
+      console.log('🚨 참여자 수 0 이하 감지, 즉시 4로 강제 변경')
+      setParticipantCount(4)
+      localStorage.setItem('gamegoo_participant_count', '4')
     }
   }, [participantCount])
+
+  // 참여자 수 초기화 시 0 방지
+  useEffect(() => {
+    // 앱 시작 시 참여자 수가 0이면 4로 설정
+    if (participantCount === 0) {
+      console.log('🚨 앱 시작 시 참여자 수 0 감지, 4로 강제 설정')
+      setParticipantCount(4)
+      localStorage.setItem('gamegoo_participant_count', '4')
+    }
+  }, [])
 
   // 초기 참여자 수 설정 함수
   const initializeParticipantCount = async () => {
@@ -328,34 +335,39 @@ function App() {
       const savedCount = localStorage.getItem('gamegoo_participant_count')
       console.log('localStorage에서 가져온 수:', savedCount)
       
-      // 3. 최종 참여자 수 결정 (Supabase 우선)
-      let finalCount = 4 // 기본값 4명
+      // 3. 최종 참여자 수 결정 (절대 0이 되지 않도록)
+      let finalCount = 4 // 기본값 4명 (절대 0이 아님)
       
       if (supabaseCount > 0) {
         // Supabase에 데이터가 있으면 우선 사용
-        finalCount = supabaseCount
+        finalCount = Math.max(supabaseCount, 4) // 최소 4명 보장
         console.log('Supabase 우선 사용:', finalCount)
-      } else if (savedCount) {
-        // Supabase에 데이터가 없으면 localStorage 사용
+      } else if (savedCount && parseInt(savedCount) > 0) {
+        // localStorage에 데이터가 있으면 사용
         const localCount = parseInt(savedCount)
-        finalCount = Math.max(localCount, finalCount)
+        finalCount = Math.max(localCount, 4) // 최소 4명 보장
         console.log('localStorage 사용 (Supabase 없음):', finalCount)
       }
       
-      // 4. 상태 업데이트 및 localStorage 동기화
+      // 4. 최종 검증 (절대 0이 되지 않도록)
+      if (finalCount <= 0) {
+        console.warn('🚫 최종 참여자 수가 0 이하, 4로 강제 설정')
+        finalCount = 4
+      }
+      
+      // 5. 상태 업데이트 및 localStorage 동기화
       setParticipantCount(finalCount)
       localStorage.setItem('gamegoo_participant_count', finalCount.toString())
       
       console.log('최종 참여자 수 설정 완료:', finalCount)
       
-      // 5. 주기적으로 Supabase와 동기화 (5초마다)
+      // 6. 주기적으로 Supabase와 동기화 (5초마다)
       const syncInterval = setInterval(async () => {
         try {
           const latestCount = await getParticipantCount()
-          if (latestCount !== finalCount) {
+          if (latestCount > finalCount) {
             console.log('동기화: 참여자 수 업데이트', finalCount, '→', latestCount)
-            setParticipantCount(latestCount)
-            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+            protectParticipantCount(latestCount) // 보호 함수 사용
             finalCount = latestCount
           }
         } catch (error) {
@@ -363,13 +375,13 @@ function App() {
         }
       }, 5000) // 5초마다
       
-      // 6. 컴포넌트 언마운트 시 인터벌 정리
+      // 7. 컴포넌트 언마운트 시 인터벌 정리
       return () => clearInterval(syncInterval)
       
     } catch (error) {
       console.error('참여자 수 초기화 중 오류:', error)
       
-      // 에러 발생 시 기본값 설정
+      // 에러 발생 시 기본값 4 설정 (절대 0이 아님)
       const fallbackCount = 4
       setParticipantCount(fallbackCount)
       localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
@@ -545,18 +557,29 @@ function App() {
     return resultType
   }
 
-  // 참여자 수 보호 함수 (절대 초기화 방지)
+  // 참여자 수 표시 함수 (0은 절대 표시하지 않음)
+  const getDisplayParticipantCount = () => {
+    // 0이면 무조건 4로 표시
+    if (participantCount <= 0) {
+      return 4
+    }
+    return participantCount
+  }
+
+  // 참여자 수 보호 함수 (절대 0이 되지 않도록)
   const protectParticipantCount = (newCount) => {
-    // 참여자 수가 0이 되지 않도록 완벽 보호
-    if (newCount > 0) {
-      setParticipantCount(newCount)
-      localStorage.setItem('gamegoo_participant_count', newCount.toString())
-      console.log('✅ 참여자 수 업데이트:', participantCount, '→', newCount)
-      return true
-    } else {
-      console.warn('🚫 참여자 수 0 방지, 현재 값 유지:', participantCount)
+    // 0 이하 값은 절대 허용하지 않음
+    if (newCount <= 0) {
+      console.warn('🚫 참여자 수 0 이하 방지, 4로 강제 설정')
+      setParticipantCount(4)
+      localStorage.setItem('gamegoo_participant_count', '4')
       return false
     }
+    
+    setParticipantCount(newCount)
+    localStorage.setItem('gamegoo_participant_count', newCount.toString())
+    console.log('✅ 참여자 수 업데이트:', participantCount, '→', newCount)
+    return true
   }
 
   // 참여자 수 강제 보호 함수
@@ -657,7 +680,7 @@ function App() {
     console.log('현재 참여자 수 보호:', participantCount)
     
     // 참여자 수 백업 (절대 잃지 않도록)
-    const protectedCount = participantCount
+    const protectedCount = Math.max(participantCount, 4) // 최소 4명 보장
     
     // 테스트 상태만 리셋 (참여자 수는 절대 건드리지 않음)
     setCurrentPage('main')
@@ -677,7 +700,11 @@ function App() {
     
     // 참여자 수 강제 보호 (절대 0이 되지 않도록)
     setTimeout(() => {
-      if (participantCount !== protectedCount) {
+      if (participantCount <= 0) {
+        console.log('🛡️ 참여자 수 0 방지, 4로 강제 복구')
+        setParticipantCount(4)
+        localStorage.setItem('gamegoo_participant_count', '4')
+      } else if (participantCount !== protectedCount) {
         console.log('🛡️ 참여자 수 강제 복구:', participantCount, '→', protectedCount)
         setParticipantCount(protectedCount)
         localStorage.setItem('gamegoo_participant_count', protectedCount.toString())
@@ -741,7 +768,7 @@ function App() {
       
       {/* 참여자 수 표시 */}
       <div className="participant-count">
-        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요</p>
+        <p>지금까지 <span className="count-highlight">{getDisplayParticipantCount().toLocaleString()}</span>명이 참여했어요</p>
       </div>
       
       <button className="start-btn" onClick={startTest}>
