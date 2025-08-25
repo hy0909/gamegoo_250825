@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { supabase, generateSessionId, getUtmParams } from './supabase'
+import { supabase, generateSessionId, getUtmParams, isSupabaseConnected } from './supabase'
 import RadarChart from './RadarChart'
 
 // 롤BTI 질문 데이터 (9가지 질문)
@@ -288,6 +288,11 @@ function App() {
 
   // 페이지 방문 로그 함수
   const logPageVisit = async (pageType, questionNumber = null, resultType = null) => {
+    if (!isSupabaseConnected()) {
+      console.log('Supabase 연결 없음 - 로그 저장 건너뜀')
+      return
+    }
+    
     try {
       const { data, error } = await supabase
         .from('page_visits')
@@ -312,6 +317,11 @@ function App() {
 
   // 테스트 결과 저장 함수
   const saveTestResult = async (resultType, resultTitle, userAnswers) => {
+    if (!isSupabaseConnected()) {
+      console.log('Supabase 연결 없음 - 결과 저장 건너뜀')
+      return
+    }
+    
     try {
       const { data, error } = await supabase
         .from('user_test_results')
@@ -339,6 +349,11 @@ function App() {
 
   // 공유 버튼 클릭 로그
   const logShareButtonClick = async () => {
+    if (!isSupabaseConnected()) {
+      console.log('Supabase 연결 없음 - 공유 로그 건너뜀')
+      return
+    }
+    
     try {
       const { error } = await supabase
         .from('user_test_results')
@@ -353,6 +368,11 @@ function App() {
 
   // 테스트 재시작 로그
   const logTestRestart = async () => {
+    if (!isSupabaseConnected()) {
+      console.log('Supabase 연결 없음 - 재시작 로그 건너뜀')
+      return
+    }
+    
     try {
       const { error } = await supabase
         .from('user_test_results')
