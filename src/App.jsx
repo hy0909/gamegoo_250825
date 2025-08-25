@@ -317,17 +317,12 @@ function App() {
     }
   }, [])
 
-  // 초기 참여자 수 설정 함수 (누적 보존)
+  // 초기 참여자 수 설정 함수 (Supabase 우선 동기화)
   const initializeParticipantCount = async () => {
     try {
       console.log('=== 참여자 수 초기화 시작 ===')
       
-      // 1. localStorage에서 저장된 수 확인 (우선)
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      const localCount = savedCount ? parseInt(savedCount) : 0
-      console.log('localStorage에서 가져온 수:', localCount)
-      
-      // 2. Supabase에서 최신 참여자 수 가져오기
+      // 1. Supabase에서 최신 참여자 수 가져오기 (우선)
       let supabaseCount = 0
       try {
         supabaseCount = await getParticipantCount()
@@ -336,17 +331,22 @@ function App() {
         console.error('Supabase 조회 실패:', error)
       }
       
-      // 3. 최종 참여자 수 결정 (누적 보존)
+      // 2. localStorage에서 저장된 수 확인 (보조)
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      const localCount = savedCount ? parseInt(savedCount) : 0
+      console.log('localStorage에서 가져온 수:', localCount)
+      
+      // 3. 최종 참여자 수 결정 (Supabase 우선)
       let finalCount = 4 // 기본값 4명
       
-      if (localCount > 0) {
-        // localStorage에 데이터가 있으면 우선 사용 (누적 보존)
-        finalCount = localCount
-        console.log('localStorage 우선 사용 (누적 보존):', finalCount)
-      } else if (supabaseCount > 0) {
-        // localStorage가 없고 Supabase에 데이터가 있으면 사용
+      if (supabaseCount > 0) {
+        // Supabase에 데이터가 있으면 우선 사용 (전역 동기화)
         finalCount = Math.max(supabaseCount, 4)
-        console.log('Supabase 사용 (localStorage 없음):', finalCount)
+        console.log('Supabase 우선 사용 (전역 동기화):', finalCount)
+      } else if (localCount > 0) {
+        // Supabase가 없고 localStorage에 데이터가 있으면 사용
+        finalCount = Math.max(localCount, 4)
+        console.log('localStorage 사용 (Supabase 없음):', finalCount)
       }
       
       // 4. 최종 검증 (절대 0이 되지 않도록)
@@ -359,15 +359,15 @@ function App() {
       setParticipantCount(finalCount)
       localStorage.setItem('gamegoo_participant_count', finalCount.toString())
       
-      console.log('최종 참여자 수 설정 완료 (누적 보존):', finalCount)
+      console.log('최종 참여자 수 설정 완료 (전역 동기화):', finalCount)
       
-      // 6. 주기적으로 Supabase와 동기화 (10초마다, 누적 보존)
+      // 6. 주기적으로 Supabase와 동기화 (5초마다, 전역 동기화)
       const syncInterval = setInterval(async () => {
         try {
           const latestCount = await getParticipantCount()
-          // Supabase 수가 더 크면 업데이트 (누적 증가만 허용)
+          // Supabase 수가 더 크면 업데이트 (전역 동기화)
           if (latestCount > finalCount) {
-            console.log('동기화: 참여자 수 누적 증가', finalCount, '→', latestCount)
+            console.log('동기화: 참여자 수 전역 업데이트', finalCount, '→', latestCount)
             setParticipantCount(latestCount)
             localStorage.setItem('gamegoo_participant_count', latestCount.toString())
             finalCount = latestCount
@@ -375,7 +375,7 @@ function App() {
         } catch (error) {
           console.error('동기화 중 오류:', error)
         }
-      }, 10000) // 10초마다
+      }, 5000) // 5초마다
       
       // 7. 컴포넌트 언마운트 시 인터벌 정리
       return () => clearInterval(syncInterval)
@@ -596,26 +596,13 @@ function App() {
     }
   }
 
-  // 참여자 수 증가 함수 (누적 증가, 절대 줄어들지 않음)
+  // 참여자 수 증가 함수 (즉시 Supabase 동기화)
   const increaseParticipantCount = async () => {
     try {
       console.log('=== 참여자 수 증가 시작 ===')
       console.log('현재 참여자 수:', participantCount)
       
-      // 1. Supabase에서 현재 참여자 수 가져오기
-      let currentSupabaseCount = 0
-      try {
-        currentSupabaseCount = await getParticipantCount()
-        console.log('Supabase 현재 수:', currentSupabaseCount)
-      } catch (error) {
-        console.error('Supabase 조회 실패:', error)
-      }
-      
-      // 2. 새로운 참여자 수 계산 (현재 + 1)
-      const newCount = Math.max(currentSupabaseCount, participantCount) + 1
-      console.log('새로운 참여자 수:', newCount)
-      
-      // 3. Supabase에 증가된 수 저장
+      // 1. Supabase에 참여자 수 증가 요청
       try {
         await incrementParticipantCount()
         console.log('Supabase 참여자 수 증가 완료')
@@ -623,11 +610,29 @@ function App() {
         console.error('Supabase 증가 실패:', error)
       }
       
-      // 4. 로컬 상태 업데이트 (누적 증가)
+      // 2. Supabase에서 최신 참여자 수 가져오기 (즉시 동기화)
+      let latestSupabaseCount = 0
+      try {
+        latestSupabaseCount = await getParticipantCount()
+        console.log('Supabase 최신 수:', latestSupabaseCount)
+      } catch (error) {
+        console.error('Supabase 최신 수 조회 실패:', error)
+      }
+      
+      // 3. 새로운 참여자 수 결정 (Supabase 우선)
+      let newCount = participantCount + 1 // 기본적으로 +1
+      
+      if (latestSupabaseCount > participantCount) {
+        // Supabase 수가 더 크면 Supabase 수 사용
+        newCount = latestSupabaseCount
+        console.log('Supabase 수로 동기화:', participantCount, '→', newCount)
+      }
+      
+      // 4. 로컬 상태 업데이트 및 localStorage 동기화
       setParticipantCount(newCount)
       localStorage.setItem('gamegoo_participant_count', newCount.toString())
       
-      console.log('✅ 참여자 수 누적 증가 완료:', participantCount, '→', newCount)
+      console.log('✅ 참여자 수 증가 및 동기화 완료:', participantCount, '→', newCount)
       
     } catch (error) {
       console.error('참여자 수 증가 중 오류:', error)
@@ -637,6 +642,27 @@ function App() {
       setParticipantCount(fallbackCount)
       localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
       console.log('fallback 참여자 수 증가:', fallbackCount)
+    }
+  }
+
+  // 강제 Supabase 동기화 함수
+  const forceSyncWithSupabase = async () => {
+    try {
+      console.log('=== 강제 Supabase 동기화 시작 ===')
+      
+      const latestCount = await getParticipantCount()
+      console.log('Supabase 최신 수:', latestCount)
+      
+      if (latestCount > participantCount) {
+        console.log('강제 동기화: 참여자 수 업데이트', participantCount, '→', latestCount)
+        setParticipantCount(latestCount)
+        localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+      } else {
+        console.log('동기화 불필요: 현재 수가 최신임')
+      }
+      
+    } catch (error) {
+      console.error('강제 동기화 중 오류:', error)
     }
   }
 
@@ -738,27 +764,28 @@ function App() {
     }
   }
 
+  // 메인 페이지 렌더링
   const renderMainPage = () => (
     <div className="main-page">
-      <h1>롤 BTI</h1>
-      <p className="subtitle">League of Legends MBTI</p>
-      
-      <div className="game-icons">
-        <span className="game-icon">🎮</span>
-        <span className="game-icon">⚔️</span>
-        <span className="game-icon">🏆</span>
+      <div className="title-section">
+        <h1 className="title">롤 BTI</h1>
+        <div className="emoji-container">
+          <span className="emoji">🎮</span>
+          <span className="emoji">⚔️</span>
+          <span className="emoji">🏆</span>
+        </div>
+        <p className="subtitle">나만의 롤 플레이 스타일을 알아보세요!</p>
       </div>
-      
-      <p className="description">
-        리그 오브 레전드 플레이 스타일로 알아보는 나의 성향
-      </p>
       
       {/* 참여자 수 표시 */}
       <div className="participant-count">
         <p>지금까지 <span className="count-highlight">{getDisplayParticipantCount().toLocaleString()}</span>명이 참여했어요</p>
+        <button className="sync-btn" onClick={forceSyncWithSupabase}>
+          🔄 동기화
+        </button>
       </div>
       
-      <button className="start-btn" onClick={startTest}>
+      <button className="start-btn" onClick={() => setCurrentPage('question')}>
         시작하기
       </button>
     </div>
