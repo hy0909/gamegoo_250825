@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { supabase, generateSessionId, getUtmParams } from './supabase'
+import RadarChart from './RadarChart'
 
 // 롤BTI 질문 데이터 (9가지 질문)
 const rollBtiQuestions = [
@@ -562,6 +563,9 @@ function App() {
           </div>
           
           <p className="mbti-description">{result.description}</p>
+          
+          {/* 8각형 레이더 차트 */}
+          <RadarChart answers={answers} />
           
           <div className="result-details">
             <div className="detail-section">
