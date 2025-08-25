@@ -257,28 +257,8 @@ function App() {
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
   
-  // URL 파라미터에서 참여자 수 가져오기 (완전히 다른 방식)
-  const urlParams = new URLSearchParams(window.location.search)
-  const getInitialParticipantCount = () => {
-    // 1. URL 파라미터에서 참여자 수 확인
-    const urlCount = urlParams.get('count')
-    if (urlCount && parseInt(urlCount) > 0) {
-      console.log('URL에서 참여자 수 가져옴:', urlCount)
-      return parseInt(urlCount)
-    }
-    
-    // 2. localStorage에서 참여자 수 확인
-    const savedCount = localStorage.getItem('gamegoo_participant_count')
-    if (savedCount && parseInt(savedCount) > 0) {
-      console.log('localStorage에서 참여자 수 가져옴:', savedCount)
-      return parseInt(savedCount)
-    }
-    
-    // 3. 기본값 4
-    return 4
-  }
-  
-  const [participantCount, setParticipantCount] = useState(getInitialParticipantCount())
+  // 참여자 수는 무조건 Supabase에서 가져오기 (절대 4로 초기화 안함)
+  const [participantCount, setParticipantCount] = useState(0) // 0으로 시작
   const [isLoading, setIsLoading] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState(null)
 
@@ -286,6 +266,7 @@ function App() {
   const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   
   // UTM 파라미터 추출
+  const urlParams = new URLSearchParams(window.location.search)
   const utmParams = {
     utm_source: urlParams.get('utm_source'),
     utm_medium: urlParams.get('utm_medium'),
@@ -295,7 +276,6 @@ function App() {
   // 앱 초기화
   useEffect(() => {
     console.log('=== 앱 초기화 시작 ===')
-    console.log('초기 참여자 수:', participantCount)
     
     // URL에 result 파라미터가 있으면 결과 페이지로
     const resultParam = urlParams.get('result')
@@ -306,21 +286,54 @@ function App() {
     } else {
       // 메인 페이지 방문 로그
       logPageVisit('main')
-      // 참여자 수 즉시 Supabase 동기화 (0.5초 후)
+      // 참여자 수 즉시 Supabase에서 가져오기 (0.1초 후)
       setTimeout(() => {
-        loadParticipantCount()
-      }, 500) // 1초 → 0.5초로 단축
+        loadParticipantCountFromSupabase()
+      }, 100) // 0.5초 → 0.1초로 단축
     }
   }, [])
 
-  // 참여자 수 실시간 폴링 (1초마다 - 더 빠른 동기화)
+  // 참여자 수 실시간 폴링 (1초마다 - Supabase에서 직접 가져오기)
   useEffect(() => {
     const interval = setInterval(() => {
-      loadParticipantCount()
-    }, 1000) // 3초 → 1초로 단축
+      loadParticipantCountFromSupabase()
+    }, 1000) // 1초마다
     
     return () => clearInterval(interval)
   }, [])
+
+  // Supabase에서 직접 참여자 수 가져오기 (핵심 함수)
+  const loadParticipantCountFromSupabase = async () => {
+    try {
+      console.log('🚀 Supabase에서 참여자 수 직접 가져오기 시작...')
+      setIsLoading(true)
+      
+      // 무조건 Supabase에서 최신 수 가져오기
+      const supabaseCount = await getParticipantCount()
+      console.log('✅ Supabase에서 가져온 참여자 수:', supabaseCount)
+      
+      if (supabaseCount > 0) {
+        // Supabase 수로 즉시 업데이트
+        setParticipantCount(supabaseCount)
+        localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
+        setLastSyncTime(new Date().toLocaleTimeString())
+        console.log('✅ 참여자 수 설정 완료:', supabaseCount)
+      } else {
+        // Supabase에 데이터가 없으면 기본값 4 설정
+        console.log('⚠️ Supabase에 데이터 없음, 기본값 4 설정')
+        setParticipantCount(4)
+        localStorage.setItem('gamegoo_participant_count', '4')
+      }
+      
+    } catch (error) {
+      console.error('❌ Supabase에서 참여자 수 가져오기 실패:', error)
+      // 에러 시 기본값 4 설정
+      setParticipantCount(4)
+      localStorage.setItem('gamegoo_participant_count', '4')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // 참여자 수 로드 함수 (URL 파라미터 우선 - 완전히 다른 방식)
   const loadParticipantCount = async () => {
@@ -353,40 +366,13 @@ function App() {
     }
   }
 
-  // 강제 동기화 함수 (URL 파라미터 우선 - 완전히 다른 방식)
+  // 강제 동기화 함수 (Supabase에서 직접 가져오기)
   const forceSync = async () => {
-    try {
-      setIsLoading(true)
-      console.log('🚀 강제 동기화 시작...')
-      console.log('현재 참여자 수:', participantCount)
-      
-      // Supabase에서 최신 수 가져오기
-      const supabaseCount = await getParticipantCount()
-      console.log('Supabase 최신 수:', supabaseCount)
-      
-      if (supabaseCount > 0) {
-        // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
-        if (supabaseCount > participantCount) {
-          console.log('✅ 강제 동기화 완료:', participantCount, '→', supabaseCount)
-          updateParticipantCount(supabaseCount) // 새로운 함수 사용
-        } else if (supabaseCount === participantCount) {
-          console.log('✅ 동기화 완료: 수가 동일함:', supabaseCount)
-          setLastSyncTime(new Date().toLocaleTimeString())
-        } else {
-          // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
-          console.log('🛡️ 강제 동기화 시에도 참여자 수 보호: 현재 수 유지:', participantCount)
-          setLastSyncTime(new Date().toLocaleTimeString())
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ 강제 동기화 실패:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    console.log('🚀 강제 동기화 시작...')
+    await loadParticipantCountFromSupabase()
   }
 
-  // 참여자 수 증가 함수 (URL 파라미터 우선 - 완전히 다른 방식)
+  // 참여자 수 증가 함수 (Supabase에서 직접 가져오기)
   const increaseParticipantCount = async () => {
     try {
       console.log('📈 참여자 수 증가 시작...')
@@ -395,22 +381,14 @@ function App() {
       await incrementParticipantCount()
       console.log('✅ Supabase 증가 완료')
       
-      // 2. 즉시 최신 수 가져오기
-      const latestCount = await getParticipantCount()
-      console.log('🔄 최신 수 가져옴:', latestCount)
-      
-      if (latestCount > 0) {
-        // 3. 새로운 수로 업데이트 (URL 파라미터도 함께)
-        updateParticipantCount(latestCount) // 새로운 함수 사용
-        console.log('✅ 참여자 수 증가 완료:', latestCount)
-      }
+      // 2. 즉시 Supabase에서 최신 수 가져오기
+      await loadParticipantCountFromSupabase()
+      console.log('✅ 참여자 수 증가 및 동기화 완료')
       
     } catch (error) {
       console.error('❌ 참여자 수 증가 실패:', error)
-      // 에러 시 로컬에서 +1
-      const fallbackCount = participantCount + 1
-      updateParticipantCount(fallbackCount) // 새로운 함수 사용
-      console.log('🔄 fallback 증가:', fallbackCount)
+      // 에러 시에도 Supabase에서 다시 가져오기 시도
+      await loadParticipantCountFromSupabase()
     }
   }
 
