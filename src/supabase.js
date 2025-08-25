@@ -3,9 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// 환경 변수 확인
+// 환경 변수 확인 및 디버깅
+console.log('🔍 Supabase 환경변수 확인:')
+console.log('VITE_SUPABASE_URL:', supabaseUrl ? '✅ 설정됨' : '❌ 설정 안됨')
+console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ 설정됨' : '❌ 설정 안됨')
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase 환경 변수가 설정되지 않았습니다. 기본 기능만 작동합니다.')
+  console.error('🚨 Supabase 환경 변수가 설정되지 않았습니다!')
+  console.error('VITE_SUPABASE_URL:', supabaseUrl)
+  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '설정됨' : '설정 안됨')
+  console.error('Supabase 기능이 작동하지 않습니다!')
 }
 
 // Supabase 클라이언트 생성 (환경 변수가 없어도 에러 방지)
@@ -31,13 +38,21 @@ export const getUtmParams = () => {
 
 // Supabase 연결 상태 확인 함수
 export const isSupabaseConnected = () => {
-  return supabase !== null
+  const connected = supabase !== null
+  console.log('🔍 Supabase 연결 상태:', connected ? '✅ 연결됨' : '❌ 연결 안됨')
+  return connected
 }
 
-// 참여자 수 조회 함수 (완벽 수정)
+// 참여자 수 조회 함수 (연결 상태 확인 추가)
 export const getParticipantCount = async () => {
   try {
     console.log('🔄 Supabase 참여자 수 조회 시작...')
+    
+    // Supabase 연결 상태 확인
+    if (!isSupabaseConnected()) {
+      console.error('❌ Supabase가 연결되지 않았습니다!')
+      return 4 // 기본값
+    }
     
     // participant_count 테이블에서 total_count 조회
     const { data, error } = await supabase
@@ -90,10 +105,16 @@ export const getParticipantCount = async () => {
   }
 }
 
-// 참여자 수 증가 함수 (완벽 수정)
+// 참여자 수 증가 함수 (연결 상태 확인 추가)
 export const incrementParticipantCount = async () => {
   try {
     console.log('🔄 Supabase 참여자 수 증가 시작...')
+    
+    // Supabase 연결 상태 확인
+    if (!isSupabaseConnected()) {
+      console.error('❌ Supabase가 연결되지 않았습니다!')
+      return false
+    }
     
     // 새로운 increment_participant_count_safe 함수 호출
     const { data, error } = await supabase.rpc('increment_participant_count_safe')
