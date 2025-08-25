@@ -1,108 +1,192 @@
 import React from 'react'
 
 const BarChart = ({ answers }) => {
-  // 디버깅을 위한 로그
-  console.log('BarChart answers:', answers)
+  console.log('=== BarChart 디버깅 시작 ===')
+  console.log('answers:', answers)
+  console.log('answers 타입:', typeof answers)
+  console.log('answers 길이:', answers ? answers.length : 'undefined')
   
-  // 각 축별 점수 계산 (0-100)
-  const calculateScores = () => {
-    if (!answers || answers.length === 0) {
-      console.log('answers가 없음')
-      return null
-    }
+  // answers가 없거나 비어있으면 기본 메시지 표시
+  if (!answers || answers.length === 0) {
+    console.log('answers가 없음 - 기본 메시지 표시')
+    return (
+      <div style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        color: '#ffffff',
+        background: 'rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        margin: '2rem 0',
+        border: '2px solid #00ff88'
+      }}>
+        <h3>🎯 롤BTI 4가지 축 분석</h3>
+        <p>답변을 완료하면 차트가 표시됩니다.</p>
+        <p style={{ fontSize: '0.8rem', color: '#cccccc' }}>
+          현재 answers: {JSON.stringify(answers)}
+        </p>
+      </div>
+    )
+  }
 
-    // E/I 축 (전투 참여도) - 질문 1, 5, 6
-    const eiAnswers = [answers[0], answers[4], answers[5]]
-    const eScore = Math.round((eiAnswers.filter(ans => ans === 'A').length / 3) * 100)
-    const iScore = Math.round((eiAnswers.filter(ans => ans === 'B').length / 3) * 100)
-
-    // G/C 축 (자원 사용 방식) - 질문 4, 9
-    const gcAnswers = [answers[3], answers[8]]
-    const gScore = Math.round((gcAnswers.filter(ans => ans === 'A').length / 2) * 100)
-    const cScore = Math.round((gcAnswers.filter(ans => ans === 'B').length / 2) * 100)
-
-    // P/S 축 (운영 스타일) - 질문 2, 3
-    const psAnswers = [answers[1], answers[2]]
-    const pScore = Math.round((psAnswers.filter(ans => ans === 'B').length / 2) * 100)
-    const sScore = Math.round((psAnswers.filter(ans => ans === 'A').length / 2) * 100)
-
-    // T/M 축 (멘탈 안정성) - 질문 7, 8
-    const tmAnswers = [answers[6], answers[7]]
-    const tScore = Math.round((tmAnswers.filter(ans => ans === 'A').length / 2) * 100)
-    const mScore = Math.round((tmAnswers.filter(ans => ans === 'B').length / 2) * 100)
-
-    const result = {
-      eScore, iScore, gScore, cScore, pScore, sScore, tScore, mScore
+  // 간단한 막대 그래프 생성
+  const createSimpleBarChart = () => {
+    const scores = {
+      eScore: Math.round((answers.filter((ans, index) => [0, 4, 5].includes(index) && ans === 'A').length / 3) * 100),
+      iScore: Math.round((answers.filter((ans, index) => [0, 4, 5].includes(index) && ans === 'B').length / 3) * 100),
+      gScore: Math.round((answers.filter((ans, index) => [3, 8].includes(index) && ans === 'A').length / 2) * 100),
+      cScore: Math.round((answers.filter((ans, index) => [3, 8].includes(index) && ans === 'B').length / 2) * 100),
+      pScore: Math.round((answers.filter((ans, index) => [1, 2].includes(index) && ans === 'B').length / 2) * 100),
+      sScore: Math.round((answers.filter((ans, index) => [1, 2].includes(index) && ans === 'A').length / 2) * 100),
+      tScore: Math.round((answers.filter((ans, index) => [6, 7].includes(index) && ans === 'A').length / 2) * 100),
+      mScore: Math.round((answers.filter((ans, index) => [6, 7].includes(index) && ans === 'B').length / 2) * 100)
     }
     
-    console.log('계산된 점수:', result)
-    return result
+    console.log('계산된 점수:', scores)
+    return scores
   }
 
-  const scores = calculateScores()
-  if (!scores) {
-    console.log('점수 계산 실패')
-    return <div className="bar-chart-container">답변을 완료하면 차트가 표시됩니다.</div>
-  }
-
+  const scores = createSimpleBarChart()
+  
+  // 축 데이터
   const axes = [
     {
       name: '전투 참여도',
-      type1: { name: 'E (Engager)', description: '한타, 교전 적극 참여', score: scores.eScore, color: '#00ff88' },
-      type2: { name: 'I (Isolator)', description: '내 구역에서 안정적 플레이', score: scores.iScore, color: '#00ccff' }
+      type1: { name: 'E (Engager)', score: scores.eScore, color: '#00ff88' },
+      type2: { name: 'I (Isolator)', score: scores.iScore, color: '#00ccff' }
     },
     {
       name: '자원 사용 방식',
-      type1: { name: 'G (Greedy)', description: 'CS, 킬 욕심', score: scores.gScore, color: '#ff6b6b' },
-      type2: { name: 'C (Contributor)', description: '팀원에게 자원 양보', score: scores.cScore, color: '#4ecdc4' }
+      type1: { name: 'G (Greedy)', score: scores.gScore, color: '#ff6b6b' },
+      type2: { name: 'C (Contributor)', score: scores.cScore, color: '#4ecdc4' }
     },
     {
       name: '운영 스타일',
-      type1: { name: 'P (Playsafe)', description: '안정·시야·장기전 지향', score: scores.pScore, color: '#45b7d1' },
-      type2: { name: 'S (Snowballer)', description: '초반 이득으로 굴리기', score: scores.sScore, color: '#96ceb4' }
+      type1: { name: 'P (Playsafe)', score: scores.pScore, color: '#45b7d1' },
+      type2: { name: 'S (Snowballer)', score: scores.sScore, color: '#96ceb4' }
     },
     {
       name: '멘탈 안정성',
-      type1: { name: 'T (Tiltproof)', description: '멘탈 강철', score: scores.tScore, color: '#feca57' },
-      type2: { name: 'M (Moody)', description: '감정 기복 큼', score: scores.mScore, color: '#ff9ff3' }
+      type1: { name: 'T (Tiltproof)', score: scores.tScore, color: '#feca57' },
+      type2: { name: 'M (Moody)', score: scores.mScore, color: '#ff9ff3' }
     }
   ]
 
+  console.log('BarChart 렌더링 완료')
+  
   return (
-    <div className="bar-chart-container">
-      <h3 className="chart-title">🎯 롤BTI 4가지 축 분석</h3>
-      <div className="axes-container">
+    <div style={{ 
+      margin: '2rem 0',
+      padding: '1rem',
+      background: 'rgba(255,255,255,0.05)',
+      borderRadius: '16px',
+      border: '2px solid #00ff88'
+    }}>
+      <h3 style={{ 
+        color: '#00ff88', 
+        fontSize: '1.3rem', 
+        marginBottom: '2rem',
+        textAlign: 'center',
+        fontWeight: '600'
+      }}>
+        🎯 롤BTI 4가지 축 분석
+      </h3>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {axes.map((axis, index) => (
-          <div key={index} className="axis-item">
-            <h4 className="axis-name">{axis.name}</h4>
-            <div className="bar-container">
-              <div className="type-info type1">
-                <span className="type-name">{axis.type1.name}</span>
-                <span className="type-description">{axis.type1.description}</span>
-                <span className="type-score">{axis.type1.score}%</span>
+          <div key={index} style={{
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: '12px',
+            padding: '1rem',
+            border: '1px solid rgba(255,255,255,0.2)'
+          }}>
+            <h4 style={{
+              color: '#ffffff',
+              fontSize: '1rem',
+              marginBottom: '1rem',
+              fontWeight: '600',
+              textAlign: 'center'
+            }}>
+              {axis.name}
+            </h4>
+            
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              justifyContent: 'space-between'
+            }}>
+              {/* Type 1 */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: '100px',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  marginBottom: '0.3rem'
+                }}>
+                  {axis.type1.name}
+                </span>
+                <span style={{
+                  color: axis.type1.color,
+                  fontSize: '1rem',
+                  fontWeight: '700'
+                }}>
+                  {axis.type1.score}%
+                </span>
               </div>
-              <div className="bar-wrapper">
-                <div className="bar">
-                  <div 
-                    className="bar-fill type1-fill"
-                    style={{ 
-                      width: `${axis.type1.score}%`,
-                      backgroundColor: axis.type1.color
-                    }}
-                  ></div>
-                  <div 
-                    className="bar-fill type2-fill"
-                    style={{ 
-                      width: `${axis.type2.score}%`,
-                      backgroundColor: axis.type2.color
-                    }}
-                  ></div>
-                </div>
+              
+              {/* 막대 그래프 */}
+              <div style={{
+                flex: 1,
+                height: '20px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                display: 'flex',
+                margin: '0 1rem'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${axis.type1.score}%`,
+                  backgroundColor: axis.type1.color,
+                  borderRadius: '10px 0 0 10px'
+                }}></div>
+                <div style={{
+                  height: '100%',
+                  width: `${axis.type2.score}%`,
+                  backgroundColor: axis.type2.color,
+                  borderRadius: '0 10px 10px 0'
+                }}></div>
               </div>
-              <div className="type-info type2">
-                <span className="type-name">{axis.type2.name}</span>
-                <span className="type-description">{axis.type2.description}</span>
-                <span className="type-score">{axis.type2.score}%</span>
+              
+              {/* Type 2 */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: '100px',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  marginBottom: '0.3rem'
+                }}>
+                  {axis.type2.name}
+                </span>
+                <span style={{
+                  color: axis.type2.color,
+                  fontSize: '1rem',
+                  fontWeight: '700'
+                }}>
+                  {axis.type2.score}%
+                </span>
               </div>
             </div>
           </div>
@@ -110,12 +194,25 @@ const BarChart = ({ answers }) => {
       </div>
       
       {/* 디버깅 정보 */}
-      <div style={{ marginTop: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-        <p style={{ color: '#ffffff', fontSize: '0.9rem' }}>
-          디버깅: answers 길이 = {answers ? answers.length : 0}
+      <div style={{
+        marginTop: '2rem',
+        padding: '1rem',
+        background: 'rgba(255,255,255,0.1)',
+        borderRadius: '8px',
+        fontSize: '0.9rem',
+        border: '1px solid rgba(255,255,255,0.2)'
+      }}>
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          <strong>디버깅 정보:</strong>
         </p>
-        <p style={{ color: '#ffffff', fontSize: '0.9rem' }}>
-          점수: {scores ? JSON.stringify(scores) : '없음'}
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          answers 길이: {answers.length}
+        </p>
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          answers 내용: {JSON.stringify(answers)}
+        </p>
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          점수: {JSON.stringify(scores)}
         </p>
       </div>
     </div>
