@@ -543,6 +543,10 @@ function App() {
         
         // Supabase 참여자 수 증가
         try {
+          console.log('=== 테스트 완료 - 참여자 수 증가 시작 ===')
+          console.log('현재 참여자 수:', participantCount)
+          
+          // 모든 테스트 시도마다 참여자 수 증가
           const incrementSuccess = await incrementParticipantCount()
           
           if (incrementSuccess) {
@@ -550,22 +554,22 @@ function App() {
             const newCount = participantCount + 1
             setParticipantCount(newCount)
             localStorage.setItem('gamegoo_participant_count', newCount.toString())
-            console.log('참여자 수 증가 및 저장 성공:', newCount)
+            console.log('✅ 참여자 수 증가 및 저장 성공:', participantCount, '→', newCount)
           } else {
             // 실패했으면 Supabase에서 최신 수 가져오기
             const latestCount = await getParticipantCount()
             setParticipantCount(latestCount)
             localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-            console.log('Supabase에서 최신 참여자 수 가져옴:', latestCount)
+            console.log('⚠️ Supabase에서 최신 참여자 수 가져옴:', latestCount)
           }
         } catch (error) {
-          console.error('참여자 수 증가 중 오류:', error)
+          console.error('❌ 참여자 수 증가 중 오류:', error)
           
           // 에러 발생 시에도 로컬에서 +1 증가
           const newCount = participantCount + 1
           setParticipantCount(newCount)
           localStorage.setItem('gamegoo_participant_count', newCount.toString())
-          console.log('에러 발생으로 로컬에서 참여자 수 증가:', newCount)
+          console.log('🔄 에러 발생으로 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
         }
       }
     } else {

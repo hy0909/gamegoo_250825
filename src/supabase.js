@@ -92,22 +92,35 @@ export const incrementParticipantCount = async () => {
 
     const currentCount = currentData.total_count || 0
 
-    // 2. 참여자 수 증가
+    // 2. 참여자 수 증가 (SQL 함수 사용으로 더 안전하게)
     const { data, error } = await supabase
-      .from('participant_count')
-      .update({ 
-        total_count: currentCount + 1,
-        last_updated: new Date().toISOString()
+      .rpc('increment_participant_count_safe', {
+        current_count: currentCount
       })
-      .eq('id', 1)
-      .select()
 
     if (error) {
-      console.error('참여자 수 증가 오류:', error)
-      return false
+      // RPC 함수가 없으면 직접 업데이트
+      console.log('RPC 함수 없음, 직접 업데이트 시도')
+      
+      const { data: updateData, error: updateError } = await supabase
+        .from('participant_count')
+        .update({ 
+          total_count: currentCount + 1,
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', 1)
+        .select()
+
+      if (updateError) {
+        console.error('참여자 수 증가 오류:', updateError)
+        return false
+      }
+
+      console.log('참여자 수 증가 성공 (직접 업데이트):', currentCount, '→', currentCount + 1)
+      return true
     }
 
-    console.log('참여자 수 증가 성공:', currentCount, '→', currentCount + 1)
+    console.log('참여자 수 증가 성공 (RPC):', currentCount, '→', currentCount + 1)
     return true
 
   } catch (error) {
