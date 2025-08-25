@@ -1,6 +1,9 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 const BarChart = ({ answers }) => {
+  const [animatedScores, setAnimatedScores] = useState({})
+  const [isAnimating, setIsAnimating] = useState(false)
+
   console.log('=== BarChart 디버깅 시작 ===')
   console.log('answers:', answers)
   console.log('answers 타입:', typeof answers)
@@ -28,8 +31,8 @@ const BarChart = ({ answers }) => {
     )
   }
 
-  // 간단한 막대 그래프 생성
-  const createSimpleBarChart = () => {
+  // 점수 계산
+  const calculateScores = () => {
     const scores = {
       eScore: Math.round((answers.filter((ans, index) => [0, 4, 5].includes(index) && ans === 'A').length / 3) * 100),
       iScore: Math.round((answers.filter((ans, index) => [0, 4, 5].includes(index) && ans === 'B').length / 3) * 100),
@@ -45,29 +48,63 @@ const BarChart = ({ answers }) => {
     return scores
   }
 
-  const scores = createSimpleBarChart()
+  const scores = calculateScores()
   
+  // 애니메이션 시작
+  useEffect(() => {
+    if (scores && Object.keys(scores).length > 0) {
+      setIsAnimating(true)
+      
+      // 0부터 시작해서 점수까지 애니메이션
+      const animationDuration = 1500 // 1.5초
+      const steps = 60
+      const stepDuration = animationDuration / steps
+      
+      let currentStep = 0
+      
+      const animate = () => {
+        if (currentStep <= steps) {
+          const progress = currentStep / steps
+          
+          const animatedValues = {}
+          Object.keys(scores).forEach(key => {
+            animatedValues[key] = Math.round(scores[key] * progress)
+          })
+          
+          setAnimatedScores(animatedValues)
+          currentStep++
+          
+          setTimeout(animate, stepDuration)
+        } else {
+          setIsAnimating(false)
+        }
+      }
+      
+      animate()
+    }
+  }, [scores])
+
   // 축 데이터
   const axes = [
     {
       name: '전투 참여도',
-      type1: { name: 'E (Engager)', score: scores.eScore, color: '#00ff88' },
-      type2: { name: 'I (Isolator)', score: scores.iScore, color: '#00ccff' }
+      type1: { name: 'E (Engager)', score: animatedScores.eScore || 0, color: '#00ff88' },
+      type2: { name: 'I (Isolator)', score: animatedScores.iScore || 0, color: '#00ccff' }
     },
     {
       name: '자원 사용 방식',
-      type1: { name: 'G (Greedy)', score: scores.gScore, color: '#ff6b6b' },
-      type2: { name: 'C (Contributor)', score: scores.cScore, color: '#4ecdc4' }
+      type1: { name: 'G (Greedy)', score: animatedScores.gScore || 0, color: '#ff6b6b' },
+      type2: { name: 'C (Contributor)', score: animatedScores.cScore || 0, color: '#4ecdc4' }
     },
     {
       name: '운영 스타일',
-      type1: { name: 'P (Playsafe)', score: scores.pScore, color: '#45b7d1' },
-      type2: { name: 'S (Snowballer)', score: scores.sScore, color: '#96ceb4' }
+      type1: { name: 'P (Playsafe)', score: animatedScores.pScore || 0, color: '#45b7d1' },
+      type2: { name: 'S (Snowballer)', score: animatedScores.sScore || 0, color: '#96ceb4' }
     },
     {
       name: '멘탈 안정성',
-      type1: { name: 'T (Tiltproof)', score: scores.tScore, color: '#feca57' },
-      type2: { name: 'M (Moody)', score: scores.mScore, color: '#ff9ff3' }
+      type1: { name: 'T (Tiltproof)', score: animatedScores.tScore || 0, color: '#feca57' },
+      type2: { name: 'M (Moody)', score: animatedScores.mScore || 0, color: '#ff9ff3' }
     }
   ]
 
@@ -134,7 +171,8 @@ const BarChart = ({ answers }) => {
                 <span style={{
                   color: axis.type1.color,
                   fontSize: '1rem',
-                  fontWeight: '700'
+                  fontWeight: '700',
+                  textShadow: `0 0 10px ${axis.type1.color}`
                 }}>
                   {axis.type1.score}%
                 </span>
@@ -143,25 +181,61 @@ const BarChart = ({ answers }) => {
               {/* 막대 그래프 */}
               <div style={{
                 flex: 1,
-                height: '20px',
+                height: '24px',
                 background: 'rgba(255,255,255,0.1)',
-                borderRadius: '10px',
+                borderRadius: '12px',
                 overflow: 'hidden',
                 display: 'flex',
-                margin: '0 1rem'
+                margin: '0 1rem',
+                position: 'relative'
               }}>
+                {/* Type 1 막대 */}
                 <div style={{
                   height: '100%',
                   width: `${axis.type1.score}%`,
                   backgroundColor: axis.type1.color,
-                  borderRadius: '10px 0 0 10px'
-                }}></div>
+                  borderRadius: '12px 0 0 12px',
+                  transition: 'width 0.1s ease',
+                  minWidth: '0',
+                  boxShadow: `0 0 10px ${axis.type1.color}`,
+                  position: 'relative',
+                  zIndex: 2
+                }}>
+                  {/* 막대 내부 그라데이션 효과 */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: `linear-gradient(90deg, ${axis.type1.color} 0%, rgba(255,255,255,0.3) 50%, ${axis.type1.color} 100%)`,
+                    borderRadius: '12px 0 0 12px'
+                  }}></div>
+                </div>
+                
+                {/* Type 2 막대 */}
                 <div style={{
                   height: '100%',
                   width: `${axis.type2.score}%`,
                   backgroundColor: axis.type2.color,
-                  borderRadius: '0 10px 10px 0'
-                }}></div>
+                  borderRadius: '0 12px 12px 0',
+                  transition: 'width 0.1s ease',
+                  minWidth: '0',
+                  boxShadow: `0 0 10px ${axis.type2.color}`,
+                  position: 'relative',
+                  zIndex: 1
+                }}>
+                  {/* 막대 내부 그라데이션 효과 */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: `linear-gradient(90deg, ${axis.type2.color} 0%, rgba(255,255,255,0.3) 50%, ${axis.type2.color} 100%)`,
+                    borderRadius: '0 12px 12px 0'
+                  }}></div>
+                </div>
               </div>
               
               {/* Type 2 */}
@@ -183,7 +257,8 @@ const BarChart = ({ answers }) => {
                 <span style={{
                   color: axis.type2.color,
                   fontSize: '1rem',
-                  fontWeight: '700'
+                  fontWeight: '700',
+                  textShadow: `0 0 10px ${axis.type2.color}`
                 }}>
                   {axis.type2.score}%
                 </span>
@@ -192,6 +267,18 @@ const BarChart = ({ answers }) => {
           </div>
         ))}
       </div>
+      
+      {/* 애니메이션 상태 표시 */}
+      {isAnimating && (
+        <div style={{
+          marginTop: '1rem',
+          textAlign: 'center',
+          color: '#00ff88',
+          fontSize: '0.9rem'
+        }}>
+          ⚡ 차트 애니메이션 진행 중...
+        </div>
+      )}
       
       {/* 디버깅 정보 */}
       <div style={{
@@ -212,7 +299,13 @@ const BarChart = ({ answers }) => {
           answers 내용: {JSON.stringify(answers)}
         </p>
         <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
-          점수: {JSON.stringify(scores)}
+          원본 점수: {JSON.stringify(scores)}
+        </p>
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          애니메이션 점수: {JSON.stringify(animatedScores)}
+        </p>
+        <p style={{ color: '#ffffff', margin: '0.5rem 0' }}>
+          애니메이션 상태: {isAnimating ? '진행 중' : '완료'}
         </p>
       </div>
     </div>
