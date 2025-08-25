@@ -279,10 +279,38 @@ function App() {
     } else {
       // 메인 페이지 방문 로그
       logPageVisit('main')
-      // 참여자 수 가져오기
-      loadParticipantCount()
+      
+      // 초기 참여자 수 설정
+      initializeParticipantCount()
     }
   }, [])
+
+  // 초기 참여자 수 설정 함수
+  const initializeParticipantCount = async () => {
+    try {
+      // localStorage에서 저장된 참여자 수 확인
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      
+      if (!savedCount) {
+        // 저장된 수가 없으면 Supabase에서 가져오기
+        const count = await getParticipantCount()
+        const initialCount = Math.max(count, 4) // 최소 4명으로 시작
+        
+        setParticipantCount(initialCount)
+        localStorage.setItem('gamegoo_participant_count', initialCount.toString())
+        console.log('초기 참여자 수 설정:', initialCount)
+      } else {
+        // 저장된 수가 있으면 로드
+        setParticipantCount(parseInt(savedCount))
+        console.log('저장된 참여자 수 로드:', savedCount)
+      }
+    } catch (error) {
+      console.error('초기 참여자 수 설정 중 오류:', error)
+      // 에러 발생 시 기본값 4로 설정
+      setParticipantCount(4)
+      localStorage.setItem('gamegoo_participant_count', '4')
+    }
+  }
 
   // 페이지 방문 로그 함수
   const logPageVisit = async (pageType, questionNumber = null, resultType = null) => {
@@ -385,8 +413,37 @@ function App() {
 
   // 참여자 수 로드 함수
   const loadParticipantCount = async () => {
-    const count = await getParticipantCount()
-    setParticipantCount(count)
+    try {
+      // localStorage에서 저장된 참여자 수 확인
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      
+      if (savedCount) {
+        // 저장된 수가 있으면 먼저 표시
+        setParticipantCount(parseInt(savedCount))
+        console.log('localStorage에서 참여자 수 로드:', savedCount)
+      }
+      
+      // Supabase에서 최신 참여자 수 가져오기
+      const count = await getParticipantCount()
+      
+      if (count > 0) {
+        // Supabase에서 가져온 수가 더 크면 업데이트
+        const finalCount = Math.max(count, parseInt(savedCount || 0))
+        setParticipantCount(finalCount)
+        
+        // localStorage에 저장
+        localStorage.setItem('gamegoo_participant_count', finalCount.toString())
+        console.log('참여자 수 업데이트 및 저장:', finalCount)
+      }
+    } catch (error) {
+      console.error('참여자 수 로드 중 오류:', error)
+      
+      // 에러 발생 시 localStorage에서 가져온 수라도 표시
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      if (savedCount) {
+        setParticipantCount(parseInt(savedCount))
+      }
+    }
   }
 
   // 결과 타입 계산 함수
@@ -456,8 +513,11 @@ function App() {
         saveTestResult(resultType, newAnswers)
         logPageVisit('result', resultType)
         
-        // 참여자 수 새로고침
-        loadParticipantCount()
+        // 참여자 수 증가 및 저장
+        const newCount = participantCount + 1
+        setParticipantCount(newCount)
+        localStorage.setItem('gamegoo_participant_count', newCount.toString())
+        console.log('참여자 수 증가 및 저장:', newCount)
       }
     } else {
       setCurrentQuestion(newAnswers.length)
@@ -535,7 +595,7 @@ function App() {
       
       {/* 참여자 수 표시 */}
       <div className="participant-count">
-        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요! 🎯</p>
+        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요</p>
       </div>
       
       <button className="start-btn" onClick={startTest}>
