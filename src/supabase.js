@@ -34,110 +34,80 @@ export const isSupabaseConnected = () => {
   return supabase !== null
 }
 
-// 참여자 수 가져오기 함수
+// 참여자 수 조회 함수 (완벽 수정)
 export const getParticipantCount = async () => {
-  if (!isSupabaseConnected()) {
-    console.warn('Supabase가 연결되지 않았습니다.')
-    return 0
-  }
-
   try {
-    console.log('Supabase에서 참여자 수 조회 시작')
+    console.log('🔄 Supabase 참여자 수 조회 시작...')
     
-    // 1. participant_count 테이블에서 참여자 수 가져오기
+    // participant_count 테이블에서 total_count 조회
     const { data, error } = await supabase
       .from('participant_count')
       .select('total_count')
+      .eq('id', 1)
       .single()
-
+    
     if (error) {
-      console.error('participant_count 테이블 조회 오류:', error)
+      console.error('❌ Supabase 참여자 수 조회 실패:', error)
       
-      // 2. fallback: user_test_results 테이블에서 레코드 수 가져오기
-      console.log('fallback: user_test_results 테이블에서 조회 시도')
+      // fallback: user_test_results 테이블에서 레코드 수 계산
+      console.log('🔄 fallback: user_test_results에서 레코드 수 계산...')
       const { count, error: countError } = await supabase
         .from('user_test_results')
         .select('*', { count: 'exact', head: true })
-
-      if (countError) {
-        console.error('fallback 조회 오류:', countError)
-        return 0
-      }
-
-      const fallbackCount = Math.max(count || 0, 4)
-      console.log('fallback 참여자 수:', fallbackCount)
       
-      // fallback으로 가져온 수를 participant_count 테이블에 저장
+      if (countError) {
+        console.error('❌ fallback 조회도 실패:', countError)
+        return 4 // 기본값
+      }
+      
+      const fallbackCount = count || 4
+      console.log('✅ fallback 참여자 수:', fallbackCount)
+      
+      // participant_count 테이블에 fallback 수 저장
       try {
         await supabase
           .from('participant_count')
           .upsert({ 
             id: 1, 
             total_count: fallbackCount, 
-            last_updated: new Date().toISOString() 
+            updated_at: new Date().toISOString() 
           })
-        console.log('fallback 수를 participant_count 테이블에 저장 완료')
+        console.log('✅ fallback 수를 participant_count에 저장')
       } catch (upsertError) {
-        console.error('participant_count 테이블 저장 실패:', upsertError)
+        console.error('❌ fallback 수 저장 실패:', upsertError)
       }
       
       return fallbackCount
     }
-
-    const result = data.total_count || 0
-    console.log('Supabase에서 가져온 참여자 수:', result)
-    return result
-
+    
+    const count = data.total_count || 4
+    console.log('✅ Supabase 참여자 수 조회 완료:', count)
+    return count
+    
   } catch (error) {
-    console.error('참여자 수 조회 중 오류:', error)
-    return 0
+    console.error('❌ Supabase 참여자 수 조회 중 오류:', error)
+    return 4 // 기본값
   }
 }
 
-// 참여자 수 증가 함수 (테스트 완료 시 호출)
+// 참여자 수 증가 함수 (완벽 수정)
 export const incrementParticipantCount = async () => {
-  if (!isSupabaseConnected()) {
-    console.warn('Supabase가 연결되지 않았습니다.')
-    return false
-  }
-
   try {
-    console.log('Supabase 참여자 수 증가 시도')
+    console.log('🔄 Supabase 참여자 수 증가 시작...')
     
-    // 1. 현재 참여자 수 확인
-    const { data: currentData, error: currentError } = await supabase
-      .from('participant_count')
-      .select('total_count')
-      .single()
-
-    if (currentError) {
-      console.error('현재 참여자 수 조회 오류:', currentError)
-      return false
-    }
-
-    const currentCount = currentData.total_count || 0
-    console.log('현재 참여자 수:', currentCount)
-
-    // 2. 참여자 수 증가
-    const { data, error } = await supabase
-      .from('participant_count')
-      .update({ 
-        total_count: currentCount + 1,
-        last_updated: new Date().toISOString()
-      })
-      .eq('id', 1)
-      .select()
-
+    // 새로운 increment_participant_count_safe 함수 호출
+    const { data, error } = await supabase.rpc('increment_participant_count_safe')
+    
     if (error) {
-      console.error('참여자 수 증가 오류:', error)
+      console.error('❌ Supabase 참여자 수 증가 실패:', error)
       return false
     }
-
-    console.log('✅ Supabase 참여자 수 증가 성공:', currentCount, '→', currentCount + 1)
+    
+    console.log('✅ Supabase 참여자 수 증가 완료, 새로운 수:', data)
     return true
-
+    
   } catch (error) {
-    console.error('참여자 수 증가 중 오류:', error)
+    console.error('❌ Supabase 참여자 수 증가 중 오류:', error)
     return false
   }
 } 
