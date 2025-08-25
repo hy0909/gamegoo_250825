@@ -105,14 +105,16 @@ const RadarChart = ({ answers }) => {
         max: 100,
         min: 0,
         ticks: {
-          stepSize: 20,
-          color: '#ffffff',
-          font: {
-            size: 12
+          display: false,
+          stepSize: 33.33,
+          callback: function(value, index, values) {
+            // 0, 33.33, 66.66, 100만 표시 (4개 선이지만 3개 간격)
+            return value % 33.33 === 0 ? value : '';
           }
         },
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)'
+          color: 'rgba(255, 255, 255, 0.1)',
+          circular: true
         },
         angleLines: {
           color: 'rgba(255, 255, 255, 0.1)'
@@ -147,43 +149,8 @@ const RadarChart = ({ answers }) => {
 
   return (
     <div className="radar-chart-container">
-      <h3 className="chart-title">🎯 당신의 롤BTI 프로필</h3>
       <div className="chart-wrapper">
         <Radar data={data} options={options} />
-      </div>
-      <div className="score-summary">
-        <div className="score-item">
-          <span className="score-label">E (전투 참여):</span>
-          <span className="score-value">{scores.eScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">I (안정적 플레이):</span>
-          <span className="score-value">{scores.iScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">G (자원 욕심):</span>
-          <span className="score-value">{scores.gScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">C (팀원 양보):</span>
-          <span className="score-value">{scores.cScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">P (안정 운영):</span>
-          <span className="score-value">{scores.pScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">S (초반 굴리기):</span>
-          <span className="score-value">{scores.sScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">T (멘탈 강철):</span>
-          <span className="score-value">{scores.tScore}점</span>
-        </div>
-        <div className="score-item">
-          <span className="score-label">M (감정 기복):</span>
-          <span className="score-value">{scores.mScore}점</span>
-        </div>
       </div>
     </div>
   )

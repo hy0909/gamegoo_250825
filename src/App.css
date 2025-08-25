@@ -192,6 +192,12 @@ h1 {
   text-align: left;
   position: relative;
   overflow: hidden;
+  width: 100%;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-sizing: border-box;
 }
 
 .option-btn::before {
@@ -226,6 +232,14 @@ h1 {
   box-shadow: 0 10px 30px rgba(0, 204, 255, 0.2);
 }
 
+.option-text {
+  color: #ffffff;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  margin: 0;
+  font-weight: 500;
+}
+
 .option-label {
   display: inline-block;
   background: linear-gradient(45deg, #00ff88, #00ccff);
@@ -239,14 +253,6 @@ h1 {
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-}
-
-.option-text {
-  font-size: 1.2rem;
-  color: #ffffff;
-  line-height: 1.5;
-  margin: 0;
-  font-weight: 500;
 }
 
 .question-counter {
