@@ -280,8 +280,13 @@ function App() {
       // 메인 페이지 방문 로그
       logPageVisit('main')
       
-      // 초기 참여자 수 설정
-      initializeParticipantCount()
+      // 참여자 수가 이미 설정되어 있으면 초기화하지 않음
+      if (participantCount === 0) {
+        console.log('참여자 수가 0이므로 초기화 실행')
+        initializeParticipantCount()
+      } else {
+        console.log('참여자 수가 이미 설정됨, 초기화 건너뜀:', participantCount)
+      }
     }
   }, [])
 
@@ -520,6 +525,50 @@ function App() {
     return resultType
   }
 
+  // 참여자 수 보호 함수
+  const protectParticipantCount = (newCount) => {
+    // 참여자 수가 감소하지 않도록 보호
+    if (newCount >= participantCount) {
+      setParticipantCount(newCount)
+      localStorage.setItem('gamegoo_participant_count', newCount.toString())
+      console.log('참여자 수 업데이트:', participantCount, '→', newCount)
+      return true
+    } else {
+      console.warn('참여자 수 감소 방지:', participantCount, '→', newCount)
+      return false
+    }
+  }
+
+  // 참여자 수 증가 함수
+  const increaseParticipantCount = async () => {
+    try {
+      console.log('=== 참여자 수 증가 시도 ===')
+      console.log('현재 참여자 수:', participantCount)
+      
+      // Supabase에서 참여자 수 증가
+      const incrementSuccess = await incrementParticipantCount()
+      
+      if (incrementSuccess) {
+        // 성공적으로 증가했으면 Supabase에서 최신 수 가져오기
+        const latestCount = await getParticipantCount()
+        protectParticipantCount(latestCount)
+        console.log('✅ 참여자 수 증가 및 Supabase 동기화 완료:', participantCount, '→', latestCount)
+      } else {
+        // 실패했으면 로컬에서 +1 증가
+        const newCount = participantCount + 1
+        protectParticipantCount(newCount)
+        console.log('⚠️ Supabase 실패, 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
+      }
+    } catch (error) {
+      console.error('❌ 참여자 수 증가 중 오류:', error)
+      
+      // 에러 발생 시에도 로컬에서 +1 증가
+      const newCount = participantCount + 1
+      protectParticipantCount(newCount)
+      console.log('🔄 에러 발생으로 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
+    }
+  }
+
   const startTest = () => {
     setCurrentPage('question')
     setCurrentQuestion(0)
@@ -554,35 +603,7 @@ function App() {
         logPageVisit('result', resultType)
         
         // Supabase 참여자 수 증가
-        try {
-          console.log('=== 테스트 완료 - 참여자 수 증가 시작 ===')
-          console.log('현재 참여자 수:', participantCount)
-          
-          // 모든 테스트 시도마다 참여자 수 증가
-          const incrementSuccess = await incrementParticipantCount()
-          
-          if (incrementSuccess) {
-            // 성공적으로 증가했으면 Supabase에서 최신 수 가져오기
-            const latestCount = await getParticipantCount()
-            setParticipantCount(latestCount)
-            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-            console.log('✅ 참여자 수 증가 및 Supabase 동기화 완료:', participantCount, '→', latestCount)
-          } else {
-            // 실패했으면 로컬에서 +1 증가
-            const newCount = participantCount + 1
-            setParticipantCount(newCount)
-            localStorage.setItem('gamegoo_participant_count', newCount.toString())
-            console.log('⚠️ Supabase 실패, 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
-          }
-        } catch (error) {
-          console.error('❌ 참여자 수 증가 중 오류:', error)
-          
-          // 에러 발생 시에도 로컬에서 +1 증가
-          const newCount = participantCount + 1
-          setParticipantCount(newCount)
-          localStorage.setItem('gamegoo_participant_count', newCount.toString())
-          console.log('🔄 에러 발생으로 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
-        }
+        increaseParticipantCount()
       }
     } else {
       setCurrentQuestion(newAnswers.length)
@@ -590,20 +611,27 @@ function App() {
   }
 
   const restartTest = () => {
-    // 테스트 재시작 로그
-    logTestRestart()
+    console.log('=== 테스트 재시작 ===')
+    console.log('현재 참여자 수 유지:', participantCount)
     
+    // 테스트 상태만 리셋 (참여자 수는 유지)
     setCurrentPage('main')
     setCurrentQuestion(0)
     setAnswers([])
     setResult(null)
     setShareMessage('')
     
-    // URL 파라미터 제거
-    window.history.pushState({}, '', '/')
+    // URL 파라미터 클리어
+    window.history.pushState({}, '', window.location.pathname)
+    
+    // 테스트 재시작 로그
+    logTestRestart()
     
     // 메인 페이지 방문 로그
     logPageVisit('main')
+    
+    // 참여자 수는 그대로 유지 (초기화하지 않음)
+    console.log('테스트 재시작 완료, 참여자 수 유지:', participantCount)
   }
 
   const shareResult = async () => {
