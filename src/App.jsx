@@ -257,13 +257,25 @@ function App() {
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
   
-  // localStorage에서 참여자 수 초기값 가져오기 (절대 4로 초기화 안함)
+  // URL 파라미터에서 참여자 수 가져오기 (완전히 다른 방식)
+  const urlParams = new URLSearchParams(window.location.search)
   const getInitialParticipantCount = () => {
+    // 1. URL 파라미터에서 참여자 수 확인
+    const urlCount = urlParams.get('count')
+    if (urlCount && parseInt(urlCount) > 0) {
+      console.log('URL에서 참여자 수 가져옴:', urlCount)
+      return parseInt(urlCount)
+    }
+    
+    // 2. localStorage에서 참여자 수 확인
     const savedCount = localStorage.getItem('gamegoo_participant_count')
     if (savedCount && parseInt(savedCount) > 0) {
+      console.log('localStorage에서 참여자 수 가져옴:', savedCount)
       return parseInt(savedCount)
     }
-    return 4 // localStorage에 없을 때만 4
+    
+    // 3. 기본값 4
+    return 4
   }
   
   const [participantCount, setParticipantCount] = useState(getInitialParticipantCount())
@@ -274,7 +286,6 @@ function App() {
   const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   
   // UTM 파라미터 추출
-  const urlParams = new URLSearchParams(window.location.search)
   const utmParams = {
     utm_source: urlParams.get('utm_source'),
     utm_medium: urlParams.get('utm_medium'),
@@ -311,7 +322,7 @@ function App() {
     return () => clearInterval(interval)
   }, [])
 
-  // 참여자 수 로드 함수 (절대 초기화 안함 - 누적 보존)
+  // 참여자 수 로드 함수 (URL 파라미터 우선 - 완전히 다른 방식)
   const loadParticipantCount = async () => {
     try {
       console.log('🔄 참여자 수 로드 시작...')
@@ -325,9 +336,7 @@ function App() {
         // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
         if (supabaseCount > participantCount) {
           console.log('✅ 참여자 수 업데이트:', participantCount, '→', supabaseCount)
-          setParticipantCount(supabaseCount)
-          localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
-          setLastSyncTime(new Date().toLocaleTimeString())
+          updateParticipantCount(supabaseCount) // 새로운 함수 사용
         } else if (supabaseCount === participantCount) {
           console.log('✅ 참여자 수 동일, 동기화 완료:', supabaseCount)
           setLastSyncTime(new Date().toLocaleTimeString())
@@ -344,7 +353,7 @@ function App() {
     }
   }
 
-  // 강제 동기화 함수 (절대 초기화 안함 - 누적 보존)
+  // 강제 동기화 함수 (URL 파라미터 우선 - 완전히 다른 방식)
   const forceSync = async () => {
     try {
       setIsLoading(true)
@@ -359,9 +368,7 @@ function App() {
         // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
         if (supabaseCount > participantCount) {
           console.log('✅ 강제 동기화 완료:', participantCount, '→', supabaseCount)
-          setParticipantCount(supabaseCount)
-          localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
-          setLastSyncTime(new Date().toLocaleTimeString())
+          updateParticipantCount(supabaseCount) // 새로운 함수 사용
         } else if (supabaseCount === participantCount) {
           console.log('✅ 동기화 완료: 수가 동일함:', supabaseCount)
           setLastSyncTime(new Date().toLocaleTimeString())
@@ -379,7 +386,7 @@ function App() {
     }
   }
 
-  // 참여자 수 증가 함수 (완전히 새로 작성)
+  // 참여자 수 증가 함수 (URL 파라미터 우선 - 완전히 다른 방식)
   const increaseParticipantCount = async () => {
     try {
       console.log('📈 참여자 수 증가 시작...')
@@ -393,10 +400,8 @@ function App() {
       console.log('🔄 최신 수 가져옴:', latestCount)
       
       if (latestCount > 0) {
-        // 3. 로컬 상태 업데이트
-        setParticipantCount(latestCount)
-        localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-        setLastSyncTime(new Date().toLocaleTimeString())
+        // 3. 새로운 수로 업데이트 (URL 파라미터도 함께)
+        updateParticipantCount(latestCount) // 새로운 함수 사용
         console.log('✅ 참여자 수 증가 완료:', latestCount)
       }
       
@@ -404,10 +409,30 @@ function App() {
       console.error('❌ 참여자 수 증가 실패:', error)
       // 에러 시 로컬에서 +1
       const fallbackCount = participantCount + 1
-      setParticipantCount(fallbackCount)
-      localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
+      updateParticipantCount(fallbackCount) // 새로운 함수 사용
       console.log('🔄 fallback 증가:', fallbackCount)
     }
+  }
+
+  // 참여자 수 업데이트 함수 (URL 파라미터도 함께 업데이트)
+  const updateParticipantCount = (newCount) => {
+    console.log('🔄 참여자 수 업데이트:', participantCount, '→', newCount)
+    
+    // 1. 상태 업데이트
+    setParticipantCount(newCount)
+    
+    // 2. localStorage 저장
+    localStorage.setItem('gamegoo_participant_count', newCount.toString())
+    
+    // 3. URL 파라미터 업데이트 (다른 기기에서도 동일한 수 표시)
+    const params = new URLSearchParams(window.location.search)
+    params.set('count', newCount.toString())
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+    
+    // 4. 마지막 동기화 시간 업데이트
+    setLastSyncTime(new Date().toLocaleTimeString())
+    
+    console.log('✅ 참여자 수 업데이트 완료, URL 파라미터도 업데이트됨')
   }
 
   // 테스트 재시작 (참여자 수는 절대 건드리지 않음)
