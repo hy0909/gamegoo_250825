@@ -585,6 +585,7 @@ h1 {
 .bar-chart-container {
   margin: 2rem 0;
   text-align: center;
+  padding: 1rem;
 }
 
 .chart-title {
@@ -618,6 +619,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 1rem;
+  justify-content: space-between;
 }
 
 .type-info {
@@ -652,6 +654,7 @@ h1 {
 .bar-wrapper {
   flex: 1;
   max-width: 300px;
+  margin: 0 1rem;
 }
 
 .bar {
@@ -661,12 +664,14 @@ h1 {
   overflow: hidden;
   position: relative;
   display: flex;
+  width: 100%;
 }
 
 .bar-fill {
   height: 100%;
   transition: width 0.8s ease;
   position: relative;
+  min-width: 0;
 }
 
 .type1-fill {

@@ -1,9 +1,15 @@
 import React from 'react'
 
 const BarChart = ({ answers }) => {
+  // 디버깅을 위한 로그
+  console.log('BarChart answers:', answers)
+  
   // 각 축별 점수 계산 (0-100)
   const calculateScores = () => {
-    if (!answers || answers.length === 0) return null
+    if (!answers || answers.length === 0) {
+      console.log('answers가 없음')
+      return null
+    }
 
     // E/I 축 (전투 참여도) - 질문 1, 5, 6
     const eiAnswers = [answers[0], answers[4], answers[5]]
@@ -25,13 +31,19 @@ const BarChart = ({ answers }) => {
     const tScore = Math.round((tmAnswers.filter(ans => ans === 'A').length / 2) * 100)
     const mScore = Math.round((tmAnswers.filter(ans => ans === 'B').length / 2) * 100)
 
-    return {
+    const result = {
       eScore, iScore, gScore, cScore, pScore, sScore, tScore, mScore
     }
+    
+    console.log('계산된 점수:', result)
+    return result
   }
 
   const scores = calculateScores()
-  if (!scores) return null
+  if (!scores) {
+    console.log('점수 계산 실패')
+    return <div className="bar-chart-container">답변을 완료하면 차트가 표시됩니다.</div>
+  }
 
   const axes = [
     {
@@ -95,6 +107,16 @@ const BarChart = ({ answers }) => {
             </div>
           </div>
         ))}
+      </div>
+      
+      {/* 디버깅 정보 */}
+      <div style={{ marginTop: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+        <p style={{ color: '#ffffff', fontSize: '0.9rem' }}>
+          디버깅: answers 길이 = {answers ? answers.length : 0}
+        </p>
+        <p style={{ color: '#ffffff', fontSize: '0.9rem' }}>
+          점수: {scores ? JSON.stringify(scores) : '없음'}
+        </p>
       </div>
     </div>
   )
