@@ -160,8 +160,10 @@ h1 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  max-width: 800px;
+  max-width: 600px;
+  width: 100%;
   margin: 0 auto;
+  padding: 0 1rem;
 }
 
 .question-title {
@@ -180,6 +182,7 @@ h1 {
   gap: 2rem;
   width: 100%;
   max-width: 600px;
+  align-items: stretch;
 }
 
 .option-btn {
@@ -198,6 +201,10 @@ h1 {
   flex-direction: column;
   justify-content: flex-start;
   box-sizing: border-box;
+  flex: 1;
+  align-self: stretch;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .option-btn::before {
@@ -238,6 +245,10 @@ h1 {
   line-height: 1.5;
   margin: 0;
   font-weight: 500;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 60px;
 }
 
 .option-label {
