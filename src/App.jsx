@@ -317,12 +317,17 @@ function App() {
     }
   }, [])
 
-  // 초기 참여자 수 설정 함수
+  // 초기 참여자 수 설정 함수 (누적 보존)
   const initializeParticipantCount = async () => {
     try {
       console.log('=== 참여자 수 초기화 시작 ===')
       
-      // 1. Supabase에서 최신 참여자 수 가져오기 (우선)
+      // 1. localStorage에서 저장된 수 확인 (우선)
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      const localCount = savedCount ? parseInt(savedCount) : 0
+      console.log('localStorage에서 가져온 수:', localCount)
+      
+      // 2. Supabase에서 최신 참여자 수 가져오기
       let supabaseCount = 0
       try {
         supabaseCount = await getParticipantCount()
@@ -331,22 +336,17 @@ function App() {
         console.error('Supabase 조회 실패:', error)
       }
       
-      // 2. localStorage에서 저장된 수 확인 (보조)
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      console.log('localStorage에서 가져온 수:', savedCount)
+      // 3. 최종 참여자 수 결정 (누적 보존)
+      let finalCount = 4 // 기본값 4명
       
-      // 3. 최종 참여자 수 결정 (절대 0이 되지 않도록)
-      let finalCount = 4 // 기본값 4명 (절대 0이 아님)
-      
-      if (supabaseCount > 0) {
-        // Supabase에 데이터가 있으면 우선 사용
-        finalCount = Math.max(supabaseCount, 4) // 최소 4명 보장
-        console.log('Supabase 우선 사용:', finalCount)
-      } else if (savedCount && parseInt(savedCount) > 0) {
-        // localStorage에 데이터가 있으면 사용
-        const localCount = parseInt(savedCount)
-        finalCount = Math.max(localCount, 4) // 최소 4명 보장
-        console.log('localStorage 사용 (Supabase 없음):', finalCount)
+      if (localCount > 0) {
+        // localStorage에 데이터가 있으면 우선 사용 (누적 보존)
+        finalCount = localCount
+        console.log('localStorage 우선 사용 (누적 보존):', finalCount)
+      } else if (supabaseCount > 0) {
+        // localStorage가 없고 Supabase에 데이터가 있으면 사용
+        finalCount = Math.max(supabaseCount, 4)
+        console.log('Supabase 사용 (localStorage 없음):', finalCount)
       }
       
       // 4. 최종 검증 (절대 0이 되지 않도록)
@@ -359,21 +359,23 @@ function App() {
       setParticipantCount(finalCount)
       localStorage.setItem('gamegoo_participant_count', finalCount.toString())
       
-      console.log('최종 참여자 수 설정 완료:', finalCount)
+      console.log('최종 참여자 수 설정 완료 (누적 보존):', finalCount)
       
-      // 6. 주기적으로 Supabase와 동기화 (5초마다)
+      // 6. 주기적으로 Supabase와 동기화 (10초마다, 누적 보존)
       const syncInterval = setInterval(async () => {
         try {
           const latestCount = await getParticipantCount()
+          // Supabase 수가 더 크면 업데이트 (누적 증가만 허용)
           if (latestCount > finalCount) {
-            console.log('동기화: 참여자 수 업데이트', finalCount, '→', latestCount)
-            protectParticipantCount(latestCount) // 보호 함수 사용
+            console.log('동기화: 참여자 수 누적 증가', finalCount, '→', latestCount)
+            setParticipantCount(latestCount)
+            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
             finalCount = latestCount
           }
         } catch (error) {
           console.error('동기화 중 오류:', error)
         }
-      }, 5000) // 5초마다
+      }, 10000) // 10초마다
       
       // 7. 컴포넌트 언마운트 시 인터벌 정리
       return () => clearInterval(syncInterval)
@@ -381,7 +383,7 @@ function App() {
     } catch (error) {
       console.error('참여자 수 초기화 중 오류:', error)
       
-      // 에러 발생 시 기본값 4 설정 (절대 0이 아님)
+      // 에러 발생 시 기본값 4 설정
       const fallbackCount = 4
       setParticipantCount(fallbackCount)
       localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
@@ -594,43 +596,47 @@ function App() {
     }
   }
 
-  // 참여자 수 증가 함수 (완벽 보호)
+  // 참여자 수 증가 함수 (누적 증가, 절대 줄어들지 않음)
   const increaseParticipantCount = async () => {
     try {
-      console.log('=== 참여자 수 증가 시도 ===')
+      console.log('=== 참여자 수 증가 시작 ===')
       console.log('현재 참여자 수:', participantCount)
       
-      // 현재 참여자 수 백업
-      const currentCount = participantCount
-      
-      // Supabase에서 참여자 수 증가
-      const incrementSuccess = await incrementParticipantCount()
-      
-      if (incrementSuccess) {
-        // 성공적으로 증가했으면 Supabase에서 최신 수 가져오기
-        const latestCount = await getParticipantCount()
-        if (latestCount > currentCount) {
-          protectParticipantCount(latestCount)
-          console.log('✅ 참여자 수 증가 및 Supabase 동기화 완료:', currentCount, '→', latestCount)
-        } else {
-          // Supabase에서 가져온 수가 현재보다 작으면 +1 증가
-          const newCount = currentCount + 1
-          protectParticipantCount(newCount)
-          console.log('⚠️ Supabase 수가 작음, 로컬에서 +1 증가:', currentCount, '→', newCount)
-        }
-      } else {
-        // 실패했으면 로컬에서 +1 증가
-        const newCount = currentCount + 1
-        protectParticipantCount(newCount)
-        console.log('⚠️ Supabase 실패, 로컬에서 참여자 수 증가:', currentCount, '→', newCount)
+      // 1. Supabase에서 현재 참여자 수 가져오기
+      let currentSupabaseCount = 0
+      try {
+        currentSupabaseCount = await getParticipantCount()
+        console.log('Supabase 현재 수:', currentSupabaseCount)
+      } catch (error) {
+        console.error('Supabase 조회 실패:', error)
       }
-    } catch (error) {
-      console.error('❌ 참여자 수 증가 중 오류:', error)
       
-      // 에러 발생 시에도 로컬에서 +1 증가
-      const newCount = participantCount + 1
-      protectParticipantCount(newCount)
-      console.log('🔄 에러 발생으로 로컬에서 참여자 수 증가:', participantCount, '→', newCount)
+      // 2. 새로운 참여자 수 계산 (현재 + 1)
+      const newCount = Math.max(currentSupabaseCount, participantCount) + 1
+      console.log('새로운 참여자 수:', newCount)
+      
+      // 3. Supabase에 증가된 수 저장
+      try {
+        await incrementParticipantCount()
+        console.log('Supabase 참여자 수 증가 완료')
+      } catch (error) {
+        console.error('Supabase 증가 실패:', error)
+      }
+      
+      // 4. 로컬 상태 업데이트 (누적 증가)
+      setParticipantCount(newCount)
+      localStorage.setItem('gamegoo_participant_count', newCount.toString())
+      
+      console.log('✅ 참여자 수 누적 증가 완료:', participantCount, '→', newCount)
+      
+    } catch (error) {
+      console.error('참여자 수 증가 중 오류:', error)
+      
+      // 에러 발생 시에도 로컬에서 증가
+      const fallbackCount = participantCount + 1
+      setParticipantCount(fallbackCount)
+      localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
+      console.log('fallback 참여자 수 증가:', fallbackCount)
     }
   }
 
@@ -643,33 +649,26 @@ function App() {
     logPageVisit('question', 1)
   }
 
-  const selectAnswer = async (answer) => {
+  const selectAnswer = (answer) => {
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
     
-    // 질문 페이지 방문 로그
-    logPageVisit('question')
-    
     if (newAnswers.length === rollBtiQuestions.length) {
       // 모든 질문에 답변 완료
-      const resultType = calculateResultType(newAnswers)
-      const resultData = rollBtiResults[resultType]
+      const result = calculateResultType(newAnswers)
+      setResult(rollBtiResults[result])
+      setCurrentPage('result')
       
-      if (resultData) {
-        setResult(resultData)
-        setCurrentPage('result')
-        
-        // URL 업데이트
-        const newUrl = `${window.location.origin}${window.location.pathname}?result=${resultType}`
-        window.history.pushState({}, '', newUrl)
-        
-        // 결과 저장 및 로그
-        saveTestResult(resultType, newAnswers)
-        logPageVisit('result', resultType)
-        
-        // Supabase 참여자 수 증가
-        increaseParticipantCount()
-      }
+      // 결과 페이지 로그
+      logPageVisit('result', result)
+      
+      // 참여자 수 누적 증가 (절대 줄어들지 않음!)
+      increaseParticipantCount()
+      
+      // URL에 결과 추가
+      const params = new URLSearchParams(window.location.search)
+      params.set('result', result)
+      window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
     } else {
       setCurrentQuestion(newAnswers.length)
     }
@@ -677,12 +676,12 @@ function App() {
 
   const restartTest = () => {
     console.log('=== 테스트 재시작 ===')
-    console.log('현재 참여자 수 보호:', participantCount)
+    console.log('현재 참여자 수 보존:', participantCount)
     
-    // 참여자 수 백업 (절대 잃지 않도록)
-    const protectedCount = Math.max(participantCount, 4) // 최소 4명 보장
+    // 참여자 수는 절대 건드리지 않음 (누적 보존)
+    const preservedCount = participantCount
     
-    // 테스트 상태만 리셋 (참여자 수는 절대 건드리지 않음)
+    // 테스트 상태만 리셋
     setCurrentPage('main')
     setCurrentQuestion(0)
     setAnswers([])
@@ -698,20 +697,8 @@ function App() {
     // 메인 페이지 방문 로그
     logPageVisit('main')
     
-    // 참여자 수 강제 보호 (절대 0이 되지 않도록)
-    setTimeout(() => {
-      if (participantCount <= 0) {
-        console.log('🛡️ 참여자 수 0 방지, 4로 강제 복구')
-        setParticipantCount(4)
-        localStorage.setItem('gamegoo_participant_count', '4')
-      } else if (participantCount !== protectedCount) {
-        console.log('🛡️ 참여자 수 강제 복구:', participantCount, '→', protectedCount)
-        setParticipantCount(protectedCount)
-        localStorage.setItem('gamegoo_participant_count', protectedCount.toString())
-      }
-    }, 100)
-    
-    console.log('테스트 재시작 완료, 참여자 수 완벽 보호:', protectedCount)
+    // 참여자 수는 그대로 유지 (절대 초기화 안함!)
+    console.log('테스트 재시작 완료, 참여자 수 보존:', preservedCount)
   }
 
   const shareResult = async () => {
