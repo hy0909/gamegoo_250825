@@ -235,10 +235,7 @@ h1 {
 
 /* 질문 페이지 스타일 */
 .question-page {
-  min-height: 100vh;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
+  padding: 24px;
   max-width: 400px;
   margin: 0 auto;
 }
@@ -291,25 +288,18 @@ h1 {
 }
 
 .option-btn {
+  width: fill;
   background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: left;
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  min-height: 120px;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  box-sizing: border-box;
-  flex: 1;
-  align-self: stretch;
-  word-wrap: break-word;
-  word-break: break-word;
+  align-items: center;
+  gap: 16px;
 }
 
 .option-btn::before {
@@ -345,30 +335,21 @@ h1 {
 }
 
 .option-text {
+  font-size: 20px;
   color: #ffffff;
-  font-size: 1.1rem;
-  line-height: 1.5;
-  margin: 0;
-  font-weight: 500;
+  line-height: 1.4;
+  word-spacing: -2px;
   flex: 1;
-  display: flex;
-  align-items: center;
-  min-height: 60px;
+  margin: 0;
 }
 
 .option-label {
-  display: inline-block;
-  background: linear-gradient(45deg, #00ff88, #00ccff);
-  color: #000000;
-  font-weight: 900;
-  font-size: 1.5rem;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1rem;
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #4ecdc4;
+  min-width: 24px;
+  text-align: center;
 }
 
 .question-counter {
