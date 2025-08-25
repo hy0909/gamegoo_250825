@@ -3,16 +3,21 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// 환경 변수 확인 및 디버깅
-console.log('🔍 Supabase 환경변수 확인:')
-console.log('VITE_SUPABASE_URL:', supabaseUrl ? '✅ 설정됨' : '❌ 설정 안됨')
-console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ 설정됨' : '❌ 설정 안됨')
+// 환경 변수 확인 및 강력한 디버깅
+console.log('🔍 === Supabase 환경변수 디버깅 시작 ===')
+console.log('🔍 VITE_SUPABASE_URL:', supabaseUrl)
+console.log('🔍 VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '설정됨 (길이: ' + supabaseAnonKey.length + ')' : '설정 안됨')
+console.log('🔍 import.meta.env:', import.meta.env)
+console.log('🔍 === Supabase 환경변수 디버깅 완료 ===')
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('🚨 Supabase 환경 변수가 설정되지 않았습니다!')
-  console.error('VITE_SUPABASE_URL:', supabaseUrl)
-  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '설정됨' : '설정 안됨')
-  console.error('Supabase 기능이 작동하지 않습니다!')
+  console.error('🚨 VITE_SUPABASE_URL:', supabaseUrl)
+  console.error('🚨 VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '설정됨' : '설정 안됨')
+  console.error('🚨 Supabase 기능이 작동하지 않습니다!')
+  console.error('🚨 Vercel 환경변수 설정을 확인해주세요!')
+} else {
+  console.log('✅ Supabase 환경변수 설정 완료!')
 }
 
 // Supabase 클라이언트 생성 (환경 변수가 없어도 에러 방지)
