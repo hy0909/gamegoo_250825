@@ -290,11 +290,7 @@ function App() {
     try {
       console.log('=== 참여자 수 초기화 시작 ===')
       
-      // 1. localStorage에서 저장된 수 확인
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      console.log('localStorage에서 가져온 수:', savedCount)
-      
-      // 2. Supabase에서 최신 참여자 수 가져오기
+      // 1. Supabase에서 최신 참여자 수 가져오기 (우선)
       let supabaseCount = 0
       try {
         supabaseCount = await getParticipantCount()
@@ -303,31 +299,35 @@ function App() {
         console.error('Supabase 조회 실패:', error)
       }
       
-      // 3. 최종 참여자 수 결정
+      // 2. localStorage에서 저장된 수 확인 (보조)
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      console.log('localStorage에서 가져온 수:', savedCount)
+      
+      // 3. 최종 참여자 수 결정 (Supabase 우선)
       let finalCount = 4 // 기본값 4명
       
-      if (savedCount) {
+      if (supabaseCount > 0) {
+        // Supabase에 데이터가 있으면 우선 사용
+        finalCount = supabaseCount
+        console.log('Supabase 우선 사용:', finalCount)
+      } else if (savedCount) {
+        // Supabase에 데이터가 없으면 localStorage 사용
         const localCount = parseInt(savedCount)
         finalCount = Math.max(localCount, finalCount)
-        console.log('localStorage 기반 최종 수:', finalCount)
+        console.log('localStorage 사용 (Supabase 없음):', finalCount)
       }
       
-      if (supabaseCount > 0) {
-        finalCount = Math.max(supabaseCount, finalCount)
-        console.log('Supabase 기반 최종 수:', finalCount)
-      }
-      
-      // 4. 상태 업데이트 및 저장
+      // 4. 상태 업데이트 및 localStorage 동기화
       setParticipantCount(finalCount)
       localStorage.setItem('gamegoo_participant_count', finalCount.toString())
       
       console.log('최종 참여자 수 설정 완료:', finalCount)
       
-      // 5. 주기적으로 참여자 수 동기화 (10초마다)
+      // 5. 주기적으로 Supabase와 동기화 (5초마다)
       const syncInterval = setInterval(async () => {
         try {
           const latestCount = await getParticipantCount()
-          if (latestCount > finalCount) {
+          if (latestCount !== finalCount) {
             console.log('동기화: 참여자 수 업데이트', finalCount, '→', latestCount)
             setParticipantCount(latestCount)
             localStorage.setItem('gamegoo_participant_count', latestCount.toString())
@@ -336,7 +336,7 @@ function App() {
         } catch (error) {
           console.error('동기화 중 오류:', error)
         }
-      }, 10000) // 10초마다
+      }, 5000) // 5초마다
       
       // 6. 컴포넌트 언마운트 시 인터벌 정리
       return () => clearInterval(syncInterval)
@@ -562,11 +562,11 @@ function App() {
           const incrementSuccess = await incrementParticipantCount()
           
           if (incrementSuccess) {
-            // 성공적으로 증가했으면 로컬 상태도 업데이트
-            const newCount = participantCount + 1
-            setParticipantCount(newCount)
-            localStorage.setItem('gamegoo_participant_count', newCount.toString())
-            console.log('✅ 참여자 수 증가 및 저장 성공:', participantCount, '→', newCount)
+            // 성공적으로 증가했으면 Supabase에서 최신 수 가져오기
+            const latestCount = await getParticipantCount()
+            setParticipantCount(latestCount)
+            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+            console.log('✅ 참여자 수 증가 및 Supabase 동기화 완료:', participantCount, '→', latestCount)
           } else {
             // 실패했으면 로컬에서 +1 증가
             const newCount = participantCount + 1

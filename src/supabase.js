@@ -66,6 +66,21 @@ export const getParticipantCount = async () => {
 
       const fallbackCount = Math.max(count || 0, 4)
       console.log('fallback 참여자 수:', fallbackCount)
+      
+      // fallback으로 가져온 수를 participant_count 테이블에 저장
+      try {
+        await supabase
+          .from('participant_count')
+          .upsert({ 
+            id: 1, 
+            total_count: fallbackCount, 
+            last_updated: new Date().toISOString() 
+          })
+        console.log('fallback 수를 participant_count 테이블에 저장 완료')
+      } catch (upsertError) {
+        console.error('participant_count 테이블 저장 실패:', upsertError)
+      }
+      
       return fallbackCount
     }
 
