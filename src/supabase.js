@@ -32,4 +32,28 @@ export const getUtmParams = () => {
 // Supabase 연결 상태 확인 함수
 export const isSupabaseConnected = () => {
   return supabase !== null
+}
+
+// 참여자 수 가져오기 함수
+export const getParticipantCount = async () => {
+  if (!isSupabaseConnected()) {
+    console.warn('Supabase가 연결되지 않았습니다.')
+    return 0
+  }
+
+  try {
+    const { count, error } = await supabase
+      .from('user_test_results')
+      .select('*', { count: 'exact', head: true })
+
+    if (error) {
+      console.error('참여자 수 조회 오류:', error)
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    console.error('참여자 수 조회 중 오류:', error)
+    return 0
+  }
 } 

@@ -12,15 +12,60 @@
 
 /* 메인 페이지 스타일 */
 .main-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 2rem;
   text-align: center;
+  padding: 2rem 1.5rem;
   max-width: 400px;
   margin: 0 auto;
+}
+
+.main-page h1 {
+  font-size: 3rem;
+  font-weight: 900;
+  background: linear-gradient(45deg, #00ff88, #00ccff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0;
+  text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.subtitle {
+  color: #cccccc;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  font-weight: 500;
+}
+
+.description {
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+/* 참여자 수 스타일 */
+.participant-count {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  margin: 2rem 0;
+  backdrop-filter: blur(10px);
+}
+
+.participant-count p {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.count-highlight {
+  color: #00ff88;
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
 }
 
 .hero-section {
@@ -53,13 +98,6 @@ h1 {
 @keyframes gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
-}
-
-.subtitle {
-  font-size: 1.5rem;
-  color: #cccccc;
-  margin-bottom: 2rem;
-  font-weight: 300;
 }
 
 .game-icons {

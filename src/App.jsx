@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import './App.css'
-import { supabase, generateSessionId, getUtmParams, isSupabaseConnected } from './supabase'
 import BarChart from './BarChart'
+import { supabase, generateSessionId, getUtmParams, isSupabaseConnected, getParticipantCount } from './supabase'
 
 // 롤BTI 질문 데이터 (9가지 질문)
 const rollBtiQuestions = [
@@ -258,6 +258,7 @@ function App() {
   const [shareMessage, setShareMessage] = useState('')
   const [sessionId, setSessionId] = useState('')
   const [utmParams, setUtmParams] = useState({})
+  const [participantCount, setParticipantCount] = useState(0)
 
   useEffect(() => {
     // 세션 ID 생성
@@ -268,21 +269,18 @@ function App() {
     const utm = getUtmParams()
     setUtmParams(utm)
     
-    // URL 파라미터로 결과 페이지 직접 접근 처리
+    // URL에서 result 파라미터 확인
     const urlParams = new URLSearchParams(window.location.search)
     const resultParam = urlParams.get('result')
     
-    if (resultParam && resultParam.length === 4) {
-      const resultData = rollBtiResults[resultParam]
-      if (resultData) {
-        setResult(resultData)
-        setCurrentPage('result')
-        // 결과 페이지 방문 로그
-        logPageVisit('result', null, resultParam)
-      }
+    if (resultParam && rollBtiResults[resultParam]) {
+      setResult(rollBtiResults[resultParam])
+      setCurrentPage('result')
     } else {
       // 메인 페이지 방문 로그
       logPageVisit('main')
+      // 참여자 수 가져오기
+      loadParticipantCount()
     }
   }, [])
 
@@ -385,6 +383,46 @@ function App() {
     }
   }
 
+  // 참여자 수 로드 함수
+  const loadParticipantCount = async () => {
+    const count = await getParticipantCount()
+    setParticipantCount(count)
+  }
+
+  // 결과 타입 계산 함수
+  const calculateResultType = (answers) => {
+    let resultType = ''
+    
+    // E/I 축 (전투 참여도) - 질문 1, 5, 6
+    const eiAnswers = [answers[0], answers[4], answers[5]]
+    const eCount = eiAnswers.filter(ans => ans === 'A').length
+    const iCount = eiAnswers.filter(ans => ans === 'B').length
+    resultType += eCount > iCount ? 'E' : 'I'
+
+    // G/C 축 (자원 사용 방식) - 질문 4, 9
+    const gcAnswers = [answers[3], answers[8]]
+    const gCount = gcAnswers.filter(ans => ans === 'A').length
+    const cCount = gcAnswers.filter(ans => ans === 'B').length
+    resultType += gCount > cCount ? 'G' : 'C'
+
+    // P/S 축 (운영 스타일) - 질문 2, 3
+    const psAnswers = [answers[1], answers[2]]
+    const pCount = psAnswers.filter(ans => ans === 'B').length
+    const sCount = psAnswers.filter(ans => ans === 'A').length
+    resultType += pCount > sCount ? 'P' : 'S'
+
+    // T/M 축 (멘탈 안정성) - 질문 7, 8
+    const tmAnswers = [answers[6], answers[7]]
+    const tCount = tmAnswers.filter(ans => ans === 'A').length
+    const mCount = tmAnswers.filter(ans => ans === 'B').length
+    resultType += tCount > mCount ? 'T' : 'M'
+
+    console.log('결과 타입:', resultType)
+    console.log('선택한 답변:', answers)
+    
+    return resultType
+  }
+
   const startTest = () => {
     setCurrentPage('question')
     setCurrentQuestion(0)
@@ -399,57 +437,30 @@ function App() {
     setAnswers(newAnswers)
     
     // 질문 페이지 방문 로그
-    logPageVisit('question', currentQuestion + 2)
+    logPageVisit('question')
     
     if (newAnswers.length === rollBtiQuestions.length) {
-      // 결과 계산 로직
-      let resultType = ''
-      
-      // E/I 축 (전투 참여도) - 질문 1, 5, 6
-      const eiAnswers = [newAnswers[0], newAnswers[4], newAnswers[5]]
-      const eCount = eiAnswers.filter(ans => ans === 'A').length
-      const iCount = eiAnswers.filter(ans => ans === 'B').length
-      resultType += eCount > iCount ? 'E' : 'I'
-
-      // G/C 축 (자원 사용 방식) - 질문 4, 9
-      const gcAnswers = [newAnswers[3], newAnswers[8]]
-      const gCount = gcAnswers.filter(ans => ans === 'A').length
-      const cCount = gcAnswers.filter(ans => ans === 'B').length
-      resultType += gCount > cCount ? 'G' : 'C'
-
-      // P/S 축 (운영 스타일) - 질문 2, 3
-      const psAnswers = [newAnswers[1], newAnswers[2]]
-      const pCount = psAnswers.filter(ans => ans === 'B').length
-      const sCount = psAnswers.filter(ans => ans === 'A').length
-      resultType += pCount > sCount ? 'P' : 'S'
-
-      // T/M 축 (멘탈 안정성) - 질문 7, 8
-      const tmAnswers = [newAnswers[6], newAnswers[7]]
-      const tCount = tmAnswers.filter(ans => ans === 'A').length
-      const mCount = tmAnswers.filter(ans => ans === 'B').length
-      resultType += tCount > mCount ? 'T' : 'M'
-
-      console.log('결과 타입:', resultType)
-      console.log('선택한 답변:', newAnswers)
-
+      // 모든 질문에 답변 완료
+      const resultType = calculateResultType(newAnswers)
       const resultData = rollBtiResults[resultType]
+      
       if (resultData) {
         setResult(resultData)
         setCurrentPage('result')
         
         // URL 업데이트
-        window.history.pushState({}, '', `?result=${resultType}`)
+        const newUrl = `${window.location.origin}${window.location.pathname}?result=${resultType}`
+        window.history.pushState({}, '', newUrl)
         
-        // 테스트 결과 저장
-        saveTestResult(resultType, resultData.title, newAnswers)
+        // 결과 저장 및 로그
+        saveTestResult(resultType, newAnswers)
+        logPageVisit('result', resultType)
         
-        // 결과 페이지 방문 로그
-        logPageVisit('result', null, resultType)
-      } else {
-        alert('결과를 찾을 수 없습니다. 다시 시도해주세요.')
+        // 참여자 수 새로고침
+        loadParticipantCount()
       }
     } else {
-      setCurrentQuestion(currentQuestion + 1)
+      setCurrentQuestion(newAnswers.length)
     }
   }
 
@@ -509,18 +520,24 @@ function App() {
 
   const renderMainPage = () => (
     <div className="main-page">
-      <div className="hero-section">
-        <h1 className="title">롤 BTI</h1>
-        <p className="subtitle">당신의 롤 플레이 성향을 알아보세요</p>
-        <div className="game-icons">
-          <span className="game-icon">🎮</span>
-          <span className="game-icon">⚔️</span>
-          <span className="game-icon">🏆</span>
-        </div>
+      <h1>롤 BTI</h1>
+      <p className="subtitle">League of Legends MBTI</p>
+      
+      <div className="game-icons">
+        <span className="game-icon">🎮</span>
+        <span className="game-icon">⚔️</span>
+        <span className="game-icon">🏆</span>
       </div>
-      <div className="description">
-        <p>전투 참여도, 자원 사용, 운영 스타일, 멘탈 안정성을 확인해보세요.</p>
+      
+      <p className="description">
+        리그 오브 레전드 플레이 스타일로 알아보는 나의 성향
+      </p>
+      
+      {/* 참여자 수 표시 */}
+      <div className="participant-count">
+        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요! 🎯</p>
       </div>
+      
       <button className="start-btn" onClick={startTest}>
         시작하기
       </button>
