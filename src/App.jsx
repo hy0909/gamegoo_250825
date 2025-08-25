@@ -256,7 +256,17 @@ function App() {
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
-  const [participantCount, setParticipantCount] = useState(4)
+  
+  // localStorage에서 참여자 수 초기값 가져오기 (절대 4로 초기화 안함)
+  const getInitialParticipantCount = () => {
+    const savedCount = localStorage.getItem('gamegoo_participant_count')
+    if (savedCount && parseInt(savedCount) > 0) {
+      return parseInt(savedCount)
+    }
+    return 4 // localStorage에 없을 때만 4
+  }
+  
+  const [participantCount, setParticipantCount] = useState(getInitialParticipantCount())
   const [isLoading, setIsLoading] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState(null)
 
@@ -274,6 +284,7 @@ function App() {
   // 앱 초기화
   useEffect(() => {
     console.log('=== 앱 초기화 시작 ===')
+    console.log('초기 참여자 수:', participantCount)
     
     // URL에 result 파라미터가 있으면 결과 페이지로
     const resultParam = urlParams.get('result')
@@ -284,10 +295,10 @@ function App() {
     } else {
       // 메인 페이지 방문 로그
       logPageVisit('main')
-      // 참여자 수 즉시 강제 동기화 (1초 후)
+      // 참여자 수 즉시 Supabase 동기화 (0.5초 후)
       setTimeout(() => {
         loadParticipantCount()
-      }, 1000)
+      }, 500) // 1초 → 0.5초로 단축
     }
   }, [])
 
@@ -300,56 +311,65 @@ function App() {
     return () => clearInterval(interval)
   }, [])
 
-  // 참여자 수 로드 함수 (완전히 새로 작성 - 강제로 Supabase에서 가져오기)
+  // 참여자 수 로드 함수 (절대 초기화 안함 - 누적 보존)
   const loadParticipantCount = async () => {
     try {
-      console.log('🔄 참여자 수 강제 로드 시작...')
+      console.log('🔄 참여자 수 로드 시작...')
+      console.log('현재 참여자 수:', participantCount)
       
-      // 무조건 Supabase에서 최신 수 가져오기 (localStorage 무시)
+      // Supabase에서 최신 수 가져오기
       const supabaseCount = await getParticipantCount()
       console.log('Supabase에서 가져온 수:', supabaseCount)
       
       if (supabaseCount > 0) {
-        // Supabase 수가 현재보다 크면 무조건 업데이트
+        // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
         if (supabaseCount > participantCount) {
-          console.log('✅ 참여자 수 강제 업데이트:', participantCount, '→', supabaseCount)
+          console.log('✅ 참여자 수 업데이트:', participantCount, '→', supabaseCount)
           setParticipantCount(supabaseCount)
           localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
           setLastSyncTime(new Date().toLocaleTimeString())
         } else if (supabaseCount === participantCount) {
           console.log('✅ 참여자 수 동일, 동기화 완료:', supabaseCount)
           setLastSyncTime(new Date().toLocaleTimeString())
+        } else {
+          // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
+          console.log('🛡️ 참여자 수 보호: Supabase 수가 작음, 현재 수 유지:', participantCount)
         }
       }
       
     } catch (error) {
       console.error('❌ 참여자 수 로드 실패:', error)
-      // 에러 시에도 localStorage에서 복구 시도
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      if (savedCount && parseInt(savedCount) > participantCount) {
-        const localCount = parseInt(savedCount)
-        console.log('🔄 localStorage에서 복구:', participantCount, '→', localCount)
-        setParticipantCount(localCount)
-      }
+      // 에러 시에도 현재 수 유지 (절대 초기화 안함)
+      console.log('🛡️ 에러 발생 시에도 참여자 수 보호:', participantCount)
     }
   }
 
-  // 강제 동기화 함수 (무조건 Supabase에서 가져오기)
+  // 강제 동기화 함수 (절대 초기화 안함 - 누적 보존)
   const forceSync = async () => {
     try {
       setIsLoading(true)
       console.log('🚀 강제 동기화 시작...')
+      console.log('현재 참여자 수:', participantCount)
       
-      // 무조건 Supabase에서 최신 수 가져오기
+      // Supabase에서 최신 수 가져오기
       const supabaseCount = await getParticipantCount()
       console.log('Supabase 최신 수:', supabaseCount)
       
       if (supabaseCount > 0) {
-        // 무조건 Supabase 수로 업데이트 (현재 수와 상관없이)
-        console.log('✅ 강제 동기화 완료:', participantCount, '→', supabaseCount)
-        setParticipantCount(supabaseCount)
-        localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
-        setLastSyncTime(new Date().toLocaleTimeString())
+        // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
+        if (supabaseCount > participantCount) {
+          console.log('✅ 강제 동기화 완료:', participantCount, '→', supabaseCount)
+          setParticipantCount(supabaseCount)
+          localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
+          setLastSyncTime(new Date().toLocaleTimeString())
+        } else if (supabaseCount === participantCount) {
+          console.log('✅ 동기화 완료: 수가 동일함:', supabaseCount)
+          setLastSyncTime(new Date().toLocaleTimeString())
+        } else {
+          // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
+          console.log('🛡️ 강제 동기화 시에도 참여자 수 보호: 현재 수 유지:', participantCount)
+          setLastSyncTime(new Date().toLocaleTimeString())
+        }
       }
       
     } catch (error) {
