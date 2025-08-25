@@ -251,461 +251,146 @@ const rollBtiResults = {
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('main') // main, question, result
+  const [currentPage, setCurrentPage] = useState('main')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
-  const [sessionId, setSessionId] = useState('')
-  const [utmParams, setUtmParams] = useState({})
-  const [participantCount, setParticipantCount] = useState(0)
+  const [participantCount, setParticipantCount] = useState(4)
+  const [isLoading, setIsLoading] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState(null)
 
+  // 세션 ID 생성
+  const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  
+  // UTM 파라미터 추출
+  const urlParams = new URLSearchParams(window.location.search)
+  const utmParams = {
+    utm_source: urlParams.get('utm_source'),
+    utm_medium: urlParams.get('utm_medium'),
+    utm_campaign: urlParams.get('utm_campaign')
+  }
+
+  // 앱 초기화
   useEffect(() => {
-    // 세션 ID 생성
-    const newSessionId = generateSessionId()
-    setSessionId(newSessionId)
+    console.log('=== 앱 초기화 시작 ===')
     
-    // UTM 파라미터 추출
-    const utm = getUtmParams()
-    setUtmParams(utm)
-    
-    // URL에서 result 파라미터 확인
-    const urlParams = new URLSearchParams(window.location.search)
+    // URL에 result 파라미터가 있으면 결과 페이지로
     const resultParam = urlParams.get('result')
-    
     if (resultParam && rollBtiResults[resultParam]) {
       setResult(rollBtiResults[resultParam])
       setCurrentPage('result')
+      logPageVisit('result', resultParam)
     } else {
       // 메인 페이지 방문 로그
       logPageVisit('main')
-      
-      // 참여자 수 보호 로직 (절대 0이 되지 않도록)
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      if (savedCount && parseInt(savedCount) > 0) {
-        // localStorage에 저장된 수가 있으면 우선 사용
-        const count = parseInt(savedCount)
-        setParticipantCount(count)
-        console.log('🛡️ localStorage에서 참여자 수 복구:', count)
-      } else if (participantCount === 0) {
-        // 참여자 수가 0이면 초기화 실행
-        console.log('참여자 수가 0이므로 초기화 실행')
-        initializeParticipantCount()
-      } else {
-        console.log('참여자 수가 이미 설정됨, 초기화 건너뜀:', participantCount)
-      }
+      // 참여자 수 즉시 로드
+      loadParticipantCount()
     }
   }, [])
 
-  // 참여자 수 보호 useEffect (0은 절대 허용하지 않음)
+  // 참여자 수 실시간 폴링 (3초마다)
   useEffect(() => {
-    // 참여자 수가 0 이하면 즉시 4로 강제 변경
-    if (participantCount <= 0) {
-      console.log('🚨 참여자 수 0 이하 감지, 즉시 4로 강제 변경')
-      setParticipantCount(4)
-      localStorage.setItem('gamegoo_participant_count', '4')
-    }
-  }, [participantCount])
-
-  // 참여자 수 초기화 시 0 방지
-  useEffect(() => {
-    // 앱 시작 시 참여자 수가 0이면 4로 설정
-    if (participantCount === 0) {
-      console.log('🚨 앱 시작 시 참여자 수 0 감지, 4로 강제 설정')
-      setParticipantCount(4)
-      localStorage.setItem('gamegoo_participant_count', '4')
-    }
+    const interval = setInterval(() => {
+      loadParticipantCount()
+    }, 3000)
+    
+    return () => clearInterval(interval)
   }, [])
 
-  // 초기 참여자 수 설정 함수 (Supabase 우선 동기화)
-  const initializeParticipantCount = async () => {
-    try {
-      console.log('=== 참여자 수 초기화 시작 ===')
-      
-      // 1. Supabase에서 최신 참여자 수 가져오기 (우선)
-      let supabaseCount = 0
-      try {
-        supabaseCount = await getParticipantCount()
-        console.log('Supabase에서 가져온 수:', supabaseCount)
-      } catch (error) {
-        console.error('Supabase 조회 실패:', error)
-      }
-      
-      // 2. localStorage에서 저장된 수 확인 (보조)
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
-      const localCount = savedCount ? parseInt(savedCount) : 0
-      console.log('localStorage에서 가져온 수:', localCount)
-      
-      // 3. 최종 참여자 수 결정 (Supabase 우선)
-      let finalCount = 4 // 기본값 4명
-      
-      if (supabaseCount > 0) {
-        // Supabase에 데이터가 있으면 우선 사용 (전역 동기화)
-        finalCount = Math.max(supabaseCount, 4)
-        console.log('Supabase 우선 사용 (전역 동기화):', finalCount)
-      } else if (localCount > 0) {
-        // Supabase가 없고 localStorage에 데이터가 있으면 사용
-        finalCount = Math.max(localCount, 4)
-        console.log('localStorage 사용 (Supabase 없음):', finalCount)
-      }
-      
-      // 4. 최종 검증 (절대 0이 되지 않도록)
-      if (finalCount <= 0) {
-        console.warn('🚫 최종 참여자 수가 0 이하, 4로 강제 설정')
-        finalCount = 4
-      }
-      
-      // 5. 상태 업데이트 및 localStorage 동기화
-      setParticipantCount(finalCount)
-      localStorage.setItem('gamegoo_participant_count', finalCount.toString())
-      
-      console.log('최종 참여자 수 설정 완료 (전역 동기화):', finalCount)
-      
-      // 6. 주기적으로 Supabase와 동기화 (5초마다, 전역 동기화)
-      const syncInterval = setInterval(async () => {
-        try {
-          const latestCount = await getParticipantCount()
-          // Supabase 수가 더 크면 업데이트 (전역 동기화)
-          if (latestCount > finalCount) {
-            console.log('동기화: 참여자 수 전역 업데이트', finalCount, '→', latestCount)
-            setParticipantCount(latestCount)
-            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-            finalCount = latestCount
-          }
-        } catch (error) {
-          console.error('동기화 중 오류:', error)
-        }
-      }, 5000) // 5초마다
-      
-      // 7. 컴포넌트 언마운트 시 인터벌 정리
-      return () => clearInterval(syncInterval)
-      
-    } catch (error) {
-      console.error('참여자 수 초기화 중 오류:', error)
-      
-      // 에러 발생 시 기본값 4 설정
-      const fallbackCount = 4
-      setParticipantCount(fallbackCount)
-      localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
-      console.log('fallback 참여자 수 설정:', fallbackCount)
-    }
-  }
-
-  // 페이지 방문 로그 함수
-  const logPageVisit = async (pageType, questionNumber = null, resultType = null) => {
-    if (!isSupabaseConnected()) {
-      console.log('Supabase 연결 없음 - 로그 저장 건너뜀')
-      return
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('page_visits')
-        .insert([
-          {
-            session_id: sessionId,
-            page_type: pageType,
-            question_number: questionNumber,
-            referrer: utmParams.referrer,
-            utm_source: utmParams.utm_source,
-            utm_medium: utmParams.utm_medium,
-            utm_campaign: utmParams.utm_campaign,
-            user_agent: navigator.userAgent
-          }
-        ])
-      
-      if (error) console.error('페이지 방문 로그 오류:', error)
-    } catch (error) {
-      console.error('페이지 방문 로그 저장 실패:', error)
-    }
-  }
-
-  // 테스트 결과 저장 함수
-  const saveTestResult = async (resultType, resultTitle, userAnswers) => {
-    if (!isSupabaseConnected()) {
-      console.log('Supabase 연결 없음 - 결과 저장 건너뜀')
-      return
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_test_results')
-        .insert([
-          {
-            session_id: sessionId,
-            result_type: resultType,
-            result_title: resultTitle,
-            answers: userAnswers,
-            share_button_clicked: false,
-            test_restarted: false,
-            referrer: utmParams.referrer,
-            utm_source: utmParams.utm_source,
-            utm_medium: utmParams.utm_medium,
-            utm_campaign: utmParams.utm_campaign,
-            user_agent: navigator.userAgent
-          }
-        ])
-      
-      if (error) console.error('테스트 결과 저장 오류:', error)
-    } catch (error) {
-      console.error('테스트 결과 저장 실패:', error)
-    }
-  }
-
-  // 공유 버튼 클릭 로그
-  const logShareButtonClick = async () => {
-    if (!isSupabaseConnected()) {
-      console.log('Supabase 연결 없음 - 공유 로그 건너뜀')
-      return
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('user_test_results')
-        .update({ share_button_clicked: true })
-        .eq('session_id', sessionId)
-      
-      if (error) console.error('공유 버튼 클릭 로그 오류:', error)
-    } catch (error) {
-      console.error('공유 버튼 클릭 로그 저장 실패:', error)
-    }
-  }
-
-  // 테스트 재시작 로그
-  const logTestRestart = async () => {
-    if (!isSupabaseConnected()) {
-      console.log('Supabase 연결 없음 - 재시작 로그 건너뜀')
-      return
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('user_test_results')
-        .update({ test_restarted: true })
-        .eq('session_id', sessionId)
-      
-      if (error) console.error('테스트 재시작 로그 오류:', error)
-    } catch (error) {
-      console.error('테스트 재시작 로그 저장 실패:', error)
-    }
-  }
-
-  // 참여자 수 로드 함수
+  // 참여자 수 로드 함수 (완전히 새로 작성)
   const loadParticipantCount = async () => {
     try {
-      // localStorage에서 저장된 참여자 수 확인
-      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      setIsLoading(true)
+      console.log('🔄 참여자 수 로드 시작...')
       
-      if (savedCount) {
-        // 저장된 수가 있으면 먼저 표시
-        setParticipantCount(parseInt(savedCount))
-        console.log('localStorage에서 참여자 수 로드:', savedCount)
+      // Supabase에서 최신 수 가져오기
+      const supabaseCount = await getParticipantCount()
+      console.log('Supabase에서 가져온 수:', supabaseCount)
+      
+      if (supabaseCount > 0) {
+        // Supabase 수가 더 크면 업데이트
+        if (supabaseCount > participantCount) {
+          console.log('✅ 참여자 수 업데이트:', participantCount, '→', supabaseCount)
+          setParticipantCount(supabaseCount)
+          localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
+          setLastSyncTime(new Date().toLocaleTimeString())
+        }
       }
       
-      // Supabase에서 최신 참여자 수 가져오기
-      const count = await getParticipantCount()
-      
-      if (count > 0) {
-        // Supabase에서 가져온 수가 더 크면 업데이트
-        const finalCount = Math.max(count, parseInt(savedCount || 0))
-        setParticipantCount(finalCount)
-        
-        // localStorage에 저장
-        localStorage.setItem('gamegoo_participant_count', finalCount.toString())
-        console.log('참여자 수 업데이트 및 저장:', finalCount)
-      }
     } catch (error) {
-      console.error('참여자 수 로드 중 오류:', error)
-      
-      // 에러 발생 시 localStorage에서 가져온 수라도 표시
+      console.error('❌ 참여자 수 로드 실패:', error)
+      // 에러 시 localStorage에서 복구 시도
       const savedCount = localStorage.getItem('gamegoo_participant_count')
-      if (savedCount) {
-        setParticipantCount(parseInt(savedCount))
+      if (savedCount && parseInt(savedCount) > participantCount) {
+        const localCount = parseInt(savedCount)
+        console.log('🔄 localStorage에서 복구:', participantCount, '→', localCount)
+        setParticipantCount(localCount)
       }
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // 결과 타입 계산 함수
-  const calculateResultType = (answers) => {
-    let resultType = ''
-    
-    // E/I 축 (전투 참여도) - 질문 1, 5, 6
-    const eiAnswers = [answers[0], answers[4], answers[5]]
-    const eCount = eiAnswers.filter(ans => ans === 'A').length
-    const iCount = eiAnswers.filter(ans => ans === 'B').length
-    resultType += eCount > iCount ? 'E' : 'I'
-
-    // G/C 축 (자원 사용 방식) - 질문 4, 9
-    const gcAnswers = [answers[3], answers[8]]
-    const gCount = gcAnswers.filter(ans => ans === 'A').length
-    const cCount = gcAnswers.filter(ans => ans === 'B').length
-    resultType += gCount > cCount ? 'G' : 'C'
-
-    // P/S 축 (운영 스타일) - 질문 2, 3
-    const psAnswers = [answers[1], answers[2]]
-    const pCount = psAnswers.filter(ans => ans === 'B').length
-    const sCount = psAnswers.filter(ans => ans === 'A').length
-    resultType += pCount > sCount ? 'P' : 'S'
-
-    // T/M 축 (멘탈 안정성) - 질문 7, 8
-    const tmAnswers = [answers[6], answers[7]]
-    const tCount = tmAnswers.filter(ans => ans === 'A').length
-    const mCount = tmAnswers.filter(ans => ans === 'B').length
-    resultType += tCount > mCount ? 'T' : 'M'
-
-    console.log('결과 타입:', resultType)
-    console.log('선택한 답변:', answers)
-    
-    return resultType
-  }
-
-  // 참여자 수 표시 함수 (0은 절대 표시하지 않음)
-  const getDisplayParticipantCount = () => {
-    // 0이면 무조건 4로 표시
-    if (participantCount <= 0) {
-      return 4
-    }
-    return participantCount
-  }
-
-  // 참여자 수 보호 함수 (절대 0이 되지 않도록)
-  const protectParticipantCount = (newCount) => {
-    // 0 이하 값은 절대 허용하지 않음
-    if (newCount <= 0) {
-      console.warn('🚫 참여자 수 0 이하 방지, 4로 강제 설정')
-      setParticipantCount(4)
-      localStorage.setItem('gamegoo_participant_count', '4')
-      return false
-    }
-    
-    setParticipantCount(newCount)
-    localStorage.setItem('gamegoo_participant_count', newCount.toString())
-    console.log('✅ 참여자 수 업데이트:', participantCount, '→', newCount)
-    return true
-  }
-
-  // 참여자 수 강제 보호 함수
-  const forceProtectParticipantCount = () => {
-    const savedCount = localStorage.getItem('gamegoo_participant_count')
-    if (savedCount && parseInt(savedCount) > 0) {
-      const count = parseInt(savedCount)
-      if (count !== participantCount) {
-        console.log('🛡️ 참여자 수 강제 보호:', participantCount, '→', count)
-        setParticipantCount(count)
+  // 강제 동기화 함수
+  const forceSync = async () => {
+    try {
+      setIsLoading(true)
+      console.log('🚀 강제 동기화 시작...')
+      
+      // Supabase에서 최신 수 가져오기
+      const supabaseCount = await getParticipantCount()
+      console.log('Supabase 최신 수:', supabaseCount)
+      
+      if (supabaseCount > 0) {
+        console.log('✅ 강제 동기화 완료:', participantCount, '→', supabaseCount)
+        setParticipantCount(supabaseCount)
+        localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
+        setLastSyncTime(new Date().toLocaleTimeString())
       }
+      
+    } catch (error) {
+      console.error('❌ 강제 동기화 실패:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // 참여자 수 증가 함수 (즉시 Supabase 동기화)
+  // 참여자 수 증가 함수 (완전히 새로 작성)
   const increaseParticipantCount = async () => {
     try {
-      console.log('=== 참여자 수 증가 시작 ===')
-      console.log('현재 참여자 수:', participantCount)
+      console.log('📈 참여자 수 증가 시작...')
       
-      // 1. Supabase에 참여자 수 증가 요청
-      try {
-        await incrementParticipantCount()
-        console.log('Supabase 참여자 수 증가 완료')
-      } catch (error) {
-        console.error('Supabase 증가 실패:', error)
+      // 1. Supabase에 증가 요청
+      await incrementParticipantCount()
+      console.log('✅ Supabase 증가 완료')
+      
+      // 2. 즉시 최신 수 가져오기
+      const latestCount = await getParticipantCount()
+      console.log('🔄 최신 수 가져옴:', latestCount)
+      
+      if (latestCount > 0) {
+        // 3. 로컬 상태 업데이트
+        setParticipantCount(latestCount)
+        localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+        setLastSyncTime(new Date().toLocaleTimeString())
+        console.log('✅ 참여자 수 증가 완료:', latestCount)
       }
-      
-      // 2. Supabase에서 최신 참여자 수 가져오기 (즉시 동기화)
-      let latestSupabaseCount = 0
-      try {
-        latestSupabaseCount = await getParticipantCount()
-        console.log('Supabase 최신 수:', latestSupabaseCount)
-      } catch (error) {
-        console.error('Supabase 최신 수 조회 실패:', error)
-      }
-      
-      // 3. 새로운 참여자 수 결정 (Supabase 우선)
-      let newCount = participantCount + 1 // 기본적으로 +1
-      
-      if (latestSupabaseCount > participantCount) {
-        // Supabase 수가 더 크면 Supabase 수 사용
-        newCount = latestSupabaseCount
-        console.log('Supabase 수로 동기화:', participantCount, '→', newCount)
-      }
-      
-      // 4. 로컬 상태 업데이트 및 localStorage 동기화
-      setParticipantCount(newCount)
-      localStorage.setItem('gamegoo_participant_count', newCount.toString())
-      
-      console.log('✅ 참여자 수 증가 및 동기화 완료:', participantCount, '→', newCount)
       
     } catch (error) {
-      console.error('참여자 수 증가 중 오류:', error)
-      
-      // 에러 발생 시에도 로컬에서 증가
+      console.error('❌ 참여자 수 증가 실패:', error)
+      // 에러 시 로컬에서 +1
       const fallbackCount = participantCount + 1
       setParticipantCount(fallbackCount)
       localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
-      console.log('fallback 참여자 수 증가:', fallbackCount)
+      console.log('🔄 fallback 증가:', fallbackCount)
     }
   }
 
-  // 강제 Supabase 동기화 함수
-  const forceSyncWithSupabase = async () => {
-    try {
-      console.log('=== 강제 Supabase 동기화 시작 ===')
-      
-      const latestCount = await getParticipantCount()
-      console.log('Supabase 최신 수:', latestCount)
-      
-      if (latestCount > participantCount) {
-        console.log('강제 동기화: 참여자 수 업데이트', participantCount, '→', latestCount)
-        setParticipantCount(latestCount)
-        localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-      } else {
-        console.log('동기화 불필요: 현재 수가 최신임')
-      }
-      
-    } catch (error) {
-      console.error('강제 동기화 중 오류:', error)
-    }
-  }
-
-  const startTest = () => {
-    setCurrentPage('question')
-    setCurrentQuestion(0)
-    setAnswers([])
-    setResult(null)
-    // 질문 페이지 방문 로그
-    logPageVisit('question', 1)
-  }
-
-  const selectAnswer = (answer) => {
-    const newAnswers = [...answers, answer]
-    setAnswers(newAnswers)
-    
-    if (newAnswers.length === rollBtiQuestions.length) {
-      // 모든 질문에 답변 완료
-      const result = calculateResultType(newAnswers)
-      setResult(rollBtiResults[result])
-      setCurrentPage('result')
-      
-      // 결과 페이지 로그
-      logPageVisit('result', result)
-      
-      // 참여자 수 누적 증가 (절대 줄어들지 않음!)
-      increaseParticipantCount()
-      
-      // URL에 결과 추가
-      const params = new URLSearchParams(window.location.search)
-      params.set('result', result)
-      window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
-    } else {
-      setCurrentQuestion(newAnswers.length)
-    }
-  }
-
+  // 테스트 재시작 (참여자 수는 절대 건드리지 않음)
   const restartTest = () => {
-    console.log('=== 테스트 재시작 ===')
+    console.log('🔄 테스트 재시작...')
     console.log('현재 참여자 수 보존:', participantCount)
-    
-    // 참여자 수는 절대 건드리지 않음 (누적 보존)
-    const preservedCount = participantCount
     
     // 테스트 상태만 리셋
     setCurrentPage('main')
@@ -717,50 +402,77 @@ function App() {
     // URL 파라미터 클리어
     window.history.pushState({}, '', window.location.pathname)
     
-    // 테스트 재시작 로그
+    // 로그
     logTestRestart()
-    
-    // 메인 페이지 방문 로그
     logPageVisit('main')
     
-    // 참여자 수는 그대로 유지 (절대 초기화 안함!)
-    console.log('테스트 재시작 완료, 참여자 수 보존:', preservedCount)
+    console.log('✅ 테스트 재시자 완료, 참여자 수 보존:', participantCount)
   }
 
-  const shareResult = async () => {
-    // UTM 파라미터가 포함된 공유 링크 생성
-    const baseUrl = window.location.origin + window.location.pathname
-    const resultParam = `?result=${result.type}`
-    const utmParams = `&utm_source=share&utm_medium=copy&utm_campaign=result`
-    const shareUrl = baseUrl + resultParam + utmParams
+  // 답변 선택
+  const selectAnswer = (answer) => {
+    const newAnswers = [...answers, answer]
+    setAnswers(newAnswers)
     
+    if (newAnswers.length === rollBtiQuestions.length) {
+      // 모든 질문에 답변 완료
+      const resultType = calculateResultType(newAnswers)
+      setResult(rollBtiResults[resultType])
+      setCurrentPage('result')
+      
+      // 결과 저장 및 로그
+      saveTestResult(resultType, newAnswers)
+      logPageVisit('result', resultType)
+      
+      // 참여자 수 증가
+      increaseParticipantCount()
+      
+      // URL에 결과 추가
+      const params = new URLSearchParams(window.location.search)
+      params.set('result', resultType)
+      window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+    } else {
+      setCurrentQuestion(newAnswers.length)
+    }
+  }
+
+  // 결과 계산
+  const calculateResultType = (answers) => {
+    const axisCounts = {
+      'E': 0, 'I': 0,
+      'G': 0, 'C': 0,
+      'P': 0, 'S': 0,
+      'T': 0, 'M': 0
+    }
+    
+    rollBtiQuestions.forEach((question, index) => {
+      if (answers[index] === 'A') {
+        axisCounts[question.axis[0]]++
+      } else if (answers[index] === 'B') {
+        axisCounts[question.axis[1]]++
+      }
+    })
+    
+    const resultType = 
+      (axisCounts['E'] > axisCounts['I'] ? 'E' : 'I') +
+      (axisCounts['G'] > axisCounts['C'] ? 'G' : 'C') +
+      (axisCounts['P'] > axisCounts['S'] ? 'P' : 'S') +
+      (axisCounts['T'] > axisCounts['M'] ? 'T' : 'M')
+    
+    return resultType
+  }
+
+  // 결과 공유
+  const shareResult = async () => {
     try {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?result=${result.type}`
       await navigator.clipboard.writeText(shareUrl)
       setShareMessage('링크가 복사되었습니다!')
-      
-      // 공유 버튼 클릭 로그
-      logShareButtonClick()
-      
-      setTimeout(() => {
-        setShareMessage('')
-      }, 3000)
-    } catch (err) {
-      // 클립보드 API를 지원하지 않는 경우
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      
-      setShareMessage('링크가 복사되었습니다!')
-      
-      // 공유 버튼 클릭 로그
-      logShareButtonClick()
-      
-      setTimeout(() => {
-        setShareMessage('')
-      }, 3000)
+      setTimeout(() => setShareMessage(''), 3000)
+    } catch (error) {
+      console.error('링크 복사 실패:', error)
+      setShareMessage('링크 복사에 실패했습니다.')
+      setTimeout(() => setShareMessage(''), 3000)
     }
   }
 
@@ -779,10 +491,19 @@ function App() {
       
       {/* 참여자 수 표시 */}
       <div className="participant-count">
-        <p>지금까지 <span className="count-highlight">{getDisplayParticipantCount().toLocaleString()}</span>명이 참여했어요</p>
-        <button className="sync-btn" onClick={forceSyncWithSupabase}>
-          🔄 동기화
-        </button>
+        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요</p>
+        <div className="sync-info">
+          <button 
+            className={`sync-btn ${isLoading ? 'loading' : ''}`} 
+            onClick={forceSync}
+            disabled={isLoading}
+          >
+            {isLoading ? '🔄 동기화 중...' : '🔄 동기화'}
+          </button>
+          {lastSyncTime && (
+            <span className="last-sync">마지막 동기화: {lastSyncTime}</span>
+          )}
+        </div>
       </div>
       
       <button className="start-btn" onClick={() => setCurrentPage('question')}>
