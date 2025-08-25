@@ -42,18 +42,61 @@ export const getParticipantCount = async () => {
   }
 
   try {
-    const { count, error } = await supabase
-      .from('user_test_results')
-      .select('*', { count: 'exact', head: true })
+    // 새로운 participant_count 테이블에서 참여자 수 가져오기
+    const { data, error } = await supabase
+      .from('participant_count')
+      .select('total_count')
+      .single()
 
     if (error) {
       console.error('참여자 수 조회 오류:', error)
-      return 0
+      
+      // 기존 방식으로 fallback (user_test_results 테이블 사용)
+      const { count, error: countError } = await supabase
+        .from('user_test_results')
+        .select('*', { count: 'exact', head: true })
+
+      if (countError) {
+        console.error('fallback 참여자 수 조회 오류:', countError)
+        return 0
+      }
+
+      return count || 0
     }
 
-    return count || 0
+    return data.total_count || 0
   } catch (error) {
     console.error('참여자 수 조회 중 오류:', error)
     return 0
+  }
+}
+
+// 참여자 수 증가 함수 (테스트 완료 시 호출)
+export const incrementParticipantCount = async () => {
+  if (!isSupabaseConnected()) {
+    console.warn('Supabase가 연결되지 않았습니다.')
+    return false
+  }
+
+  try {
+    // participant_count 테이블 업데이트
+    const { data, error } = await supabase
+      .from('participant_count')
+      .update({ 
+        total_count: supabase.sql`total_count + 1`,
+        last_updated: new Date().toISOString()
+      })
+      .eq('id', 1)
+      .select()
+
+    if (error) {
+      console.error('참여자 수 증가 오류:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('참여자 수 증가 중 오류:', error)
+    return false
   }
 } 

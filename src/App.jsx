@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
 import BarChart from './BarChart'
-import { supabase, generateSessionId, getUtmParams, isSupabaseConnected, getParticipantCount } from './supabase'
+import { supabase, generateSessionId, getUtmParams, isSupabaseConnected, getParticipantCount, incrementParticipantCount } from './supabase'
 
 // 롤BTI 질문 데이터 (9가지 질문)
 const rollBtiQuestions = [
@@ -489,7 +489,7 @@ function App() {
     logPageVisit('question', 1)
   }
 
-  const selectAnswer = (answer) => {
+  const selectAnswer = async (answer) => {
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
     
@@ -513,11 +513,22 @@ function App() {
         saveTestResult(resultType, newAnswers)
         logPageVisit('result', resultType)
         
-        // 참여자 수 증가 및 저장
-        const newCount = participantCount + 1
-        setParticipantCount(newCount)
-        localStorage.setItem('gamegoo_participant_count', newCount.toString())
-        console.log('참여자 수 증가 및 저장:', newCount)
+        // Supabase 참여자 수 증가
+        const incrementSuccess = await incrementParticipantCount()
+        
+        if (incrementSuccess) {
+          // 성공적으로 증가했으면 로컬 상태도 업데이트
+          const newCount = participantCount + 1
+          setParticipantCount(newCount)
+          localStorage.setItem('gamegoo_participant_count', newCount.toString())
+          console.log('참여자 수 증가 및 저장 성공:', newCount)
+        } else {
+          // 실패했으면 Supabase에서 최신 수 가져오기
+          const latestCount = await getParticipantCount()
+          setParticipantCount(latestCount)
+          localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+          console.log('Supabase에서 최신 참여자 수 가져옴:', latestCount)
+        }
       }
     } else {
       setCurrentQuestion(newAnswers.length)
