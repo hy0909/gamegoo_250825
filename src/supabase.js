@@ -79,11 +79,24 @@ export const incrementParticipantCount = async () => {
   }
 
   try {
-    // participant_count 테이블 업데이트
+    // 1. 현재 참여자 수 확인
+    const { data: currentData, error: currentError } = await supabase
+      .from('participant_count')
+      .select('total_count')
+      .single()
+
+    if (currentError) {
+      console.error('현재 참여자 수 조회 오류:', currentError)
+      return false
+    }
+
+    const currentCount = currentData.total_count || 0
+
+    // 2. 참여자 수 증가
     const { data, error } = await supabase
       .from('participant_count')
       .update({ 
-        total_count: supabase.sql`total_count + 1`,
+        total_count: currentCount + 1,
         last_updated: new Date().toISOString()
       })
       .eq('id', 1)
@@ -94,7 +107,9 @@ export const incrementParticipantCount = async () => {
       return false
     }
 
+    console.log('참여자 수 증가 성공:', currentCount, '→', currentCount + 1)
     return true
+
   } catch (error) {
     console.error('참여자 수 증가 중 오류:', error)
     return false

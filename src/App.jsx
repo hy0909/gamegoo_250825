@@ -288,27 +288,55 @@ function App() {
   // 초기 참여자 수 설정 함수
   const initializeParticipantCount = async () => {
     try {
-      // localStorage에서 저장된 참여자 수 확인
+      // 1. Supabase에서 최신 참여자 수 가져오기
+      const supabaseCount = await getParticipantCount()
+      
+      // 2. localStorage에서 저장된 수 확인
       const savedCount = localStorage.getItem('gamegoo_participant_count')
       
-      if (!savedCount) {
-        // 저장된 수가 없으면 Supabase에서 가져오기
-        const count = await getParticipantCount()
-        const initialCount = Math.max(count, 4) // 최소 4명으로 시작
-        
-        setParticipantCount(initialCount)
-        localStorage.setItem('gamegoo_participant_count', initialCount.toString())
-        console.log('초기 참여자 수 설정:', initialCount)
-      } else {
-        // 저장된 수가 있으면 로드
-        setParticipantCount(parseInt(savedCount))
-        console.log('저장된 참여자 수 로드:', savedCount)
-      }
+      // 3. 더 큰 값을 사용 (Supabase가 우선)
+      let finalCount = Math.max(supabaseCount, parseInt(savedCount || 0))
+      
+      // 4. 최소값 보장 (4명)
+      finalCount = Math.max(finalCount, 4)
+      
+      // 5. 상태 업데이트 및 저장
+      setParticipantCount(finalCount)
+      localStorage.setItem('gamegoo_participant_count', finalCount.toString())
+      
+      console.log('참여자 수 초기화 완료:', {
+        supabaseCount,
+        savedCount,
+        finalCount
+      })
+      
+      // 6. 주기적으로 참여자 수 동기화 (30초마다)
+      const syncInterval = setInterval(async () => {
+        try {
+          const latestCount = await getParticipantCount()
+          if (latestCount > finalCount) {
+            setParticipantCount(latestCount)
+            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+            console.log('참여자 수 동기화 완료:', latestCount)
+          }
+        } catch (error) {
+          console.error('참여자 수 동기화 중 오류:', error)
+        }
+      }, 30000) // 30초마다
+      
+      // 7. 컴포넌트 언마운트 시 인터벌 정리
+      return () => clearInterval(syncInterval)
+      
     } catch (error) {
       console.error('초기 참여자 수 설정 중 오류:', error)
-      // 에러 발생 시 기본값 4로 설정
-      setParticipantCount(4)
-      localStorage.setItem('gamegoo_participant_count', '4')
+      
+      // 에러 발생 시 localStorage에서 가져온 수라도 표시
+      const savedCount = localStorage.getItem('gamegoo_participant_count')
+      const fallbackCount = Math.max(parseInt(savedCount || 0), 4)
+      
+      setParticipantCount(fallbackCount)
+      localStorage.setItem('gamegoo_participant_count', fallbackCount.toString())
+      console.log('fallback 참여자 수 설정:', fallbackCount)
     }
   }
 
@@ -514,20 +542,30 @@ function App() {
         logPageVisit('result', resultType)
         
         // Supabase 참여자 수 증가
-        const incrementSuccess = await incrementParticipantCount()
-        
-        if (incrementSuccess) {
-          // 성공적으로 증가했으면 로컬 상태도 업데이트
+        try {
+          const incrementSuccess = await incrementParticipantCount()
+          
+          if (incrementSuccess) {
+            // 성공적으로 증가했으면 로컬 상태도 업데이트
+            const newCount = participantCount + 1
+            setParticipantCount(newCount)
+            localStorage.setItem('gamegoo_participant_count', newCount.toString())
+            console.log('참여자 수 증가 및 저장 성공:', newCount)
+          } else {
+            // 실패했으면 Supabase에서 최신 수 가져오기
+            const latestCount = await getParticipantCount()
+            setParticipantCount(latestCount)
+            localStorage.setItem('gamegoo_participant_count', latestCount.toString())
+            console.log('Supabase에서 최신 참여자 수 가져옴:', latestCount)
+          }
+        } catch (error) {
+          console.error('참여자 수 증가 중 오류:', error)
+          
+          // 에러 발생 시에도 로컬에서 +1 증가
           const newCount = participantCount + 1
           setParticipantCount(newCount)
           localStorage.setItem('gamegoo_participant_count', newCount.toString())
-          console.log('참여자 수 증가 및 저장 성공:', newCount)
-        } else {
-          // 실패했으면 Supabase에서 최신 수 가져오기
-          const latestCount = await getParticipantCount()
-          setParticipantCount(latestCount)
-          localStorage.setItem('gamegoo_participant_count', latestCount.toString())
-          console.log('Supabase에서 최신 참여자 수 가져옴:', latestCount)
+          console.log('에러 발생으로 로컬에서 참여자 수 증가:', newCount)
         }
       }
     } else {
