@@ -294,49 +294,27 @@ function App() {
     }
   }
 
-  // 참여자 수 증가 함수
-  const incrementParticipantCount = async () => {
+  // Supabase 연결 확인 및 참여자 수 가져오기
+  const fetchParticipantCount = useCallback(async () => {
     try {
-      if (isSupabaseConnected()) {
-        await incrementParticipantCount()
-        console.log('✅ 참여자 수 증가 완료')
-      } else {
-        console.log('⚠️ Supabase 연결 없음 - 로컬 카운트만 증가')
-        setParticipantCount(prev => prev + 1)
+      const count = await getParticipantCount();
+      if (count !== null && count !== undefined) {
+        setParticipantCount(count);
+        // localStorage에 저장
+        localStorage.setItem('participantCount', count.toString());
+        console.log('✅ Supabase에서 참여자 수 가져옴:', count);
       }
     } catch (error) {
-      console.log('❌ 참여자 수 증가 실패:', error)
-      // 로컬 카운트로 폴백
-      setParticipantCount(prev => prev + 1)
-    }
-  }
-
-  // 참여자 수 가져오기 함수
-  const fetchParticipantCount = async () => {
-    try {
-      if (isSupabaseConnected()) {
-        const count = await getParticipantCount()
-        if (count !== null) {
-          setParticipantCount(count)
-          console.log('✅ Supabase에서 참여자 수 가져옴:', count)
-        }
-      } else {
-        console.log('⚠️ Supabase 연결 없음 - 로컬 카운트 사용')
-        // localStorage에서 복구
-        const localCount = localStorage.getItem('participantCount')
-        if (localCount) {
-          setParticipantCount(parseInt(localCount))
-        }
-      }
-    } catch (error) {
-      console.log('❌ 참여자 수 가져오기 실패:', error)
-      // localStorage에서 복구
-      const localCount = localStorage.getItem('participantCount')
+      console.warn('⚠️ Supabase 연결 없음 - 로컬 카운트 사용');
+      // localStorage에서 복구 시도
+      const localCount = localStorage.getItem('participantCount');
       if (localCount) {
-        setParticipantCount(parseInt(localCount))
+        const count = parseInt(localCount, 10);
+        setParticipantCount(count);
+        console.log('🛡️ localStorage에서 참여자 수 복구:', count);
       }
     }
-  }
+  }, []);
 
   // 컴포넌트 마운트 시 참여자 수 가져오기
   useEffect(() => {
@@ -346,7 +324,7 @@ function App() {
     const interval = setInterval(fetchParticipantCount, 3000)
     
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchParticipantCount])
 
   // 참여자 수가 변경될 때마다 localStorage에 저장
   useEffect(() => {
@@ -423,36 +401,30 @@ function App() {
   }
 
   // 답변 선택 처리
-  const selectAnswer = (answer) => {
-    const newAnswers = [...answers, answer]
-    setAnswers(newAnswers)
-    
-    if (newAnswers.length === 9) {
+  const selectAnswer = async (answer) => {
+    const newAnswers = [...answers, answer];
+    setAnswers(newAnswers);
+
+    if (newAnswers.length === rollBtiQuestions.length) {
       // 모든 질문에 답변 완료
-      const resultType = calculateResultType(newAnswers)
-      const resultData = rollBtiResults[resultType] || rollBtiResults['EGPT']
+      const resultType = calculateResultType(newAnswers);
+      const result = rollBtiResults[resultType];
       
-      setResult(resultData)
-      setCurrentPage('result')
-      
-      // 참여자 수 증가
-      incrementParticipantCount()
-      
-      // Supabase에 데이터 저장
-      if (sessionId) {
-        saveUserAnswers(sessionId, newAnswers)
-        saveUserResult(sessionId, resultType, resultData.title, {
-          'E/I': { E: 0, I: 0, total: 0 },
-          'G/C': { G: 0, C: 0, total: 0 },
-          'P/S': { P: 0, S: 0, total: 0 },
-          'T/M': { T: 0, M: 0, total: 0 }
-        })
-        completeUserSession(sessionId)
+      // 로컬로만 처리 (Supabase 연결 없음)
+      try {
+        // 참여자 수 증가
+        await incrementParticipantCount();
+        
+        console.log('✅ 테스트 완료 및 로컬 데이터 저장 성공');
+      } catch (error) {
+        console.warn('⚠️ 로컬 데이터 저장 실패:', error);
       }
+
+      setCurrentPage('result');
     } else {
-      setCurrentQuestion(newAnswers.length)
+      setCurrentQuestion(newAnswers.length);
     }
-  }
+  };
 
   // 테스트 시작 함수
   const startTest = () => {
@@ -470,9 +442,6 @@ function App() {
     setResult(null)
     
     // 새로운 세션 생성
-    if (sessionId) {
-      trackUserAction(sessionId, 'restart_clicked')
-    }
     initSession()
   }
 
@@ -484,14 +453,6 @@ function App() {
       try {
         await navigator.clipboard.writeText(shareUrl)
         setShareMessage('링크가 복사되었습니다!')
-        
-        // 행동 추적
-        if (sessionId && isSupabaseConnected()) {
-          await trackUserAction(sessionId, 'share_clicked', { 
-            shared_result: result.type,
-            share_url: shareUrl
-          })
-        }
         
         setTimeout(() => setShareMessage(''), 3000)
       } catch (error) {
