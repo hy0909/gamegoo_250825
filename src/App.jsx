@@ -294,24 +294,66 @@ function App() {
     }
   }
 
-  // 초기 참여자 수 로드
-  useEffect(() => {
-    const loadParticipantCount = async () => {
-      try {
+  // 참여자 수 증가 함수
+  const incrementParticipantCount = async () => {
+    try {
+      if (isSupabaseConnected()) {
+        await incrementParticipantCount()
+        console.log('✅ 참여자 수 증가 완료')
+      } else {
+        console.log('⚠️ Supabase 연결 없음 - 로컬 카운트만 증가')
+        setParticipantCount(prev => prev + 1)
+      }
+    } catch (error) {
+      console.log('❌ 참여자 수 증가 실패:', error)
+      // 로컬 카운트로 폴백
+      setParticipantCount(prev => prev + 1)
+    }
+  }
+
+  // 참여자 수 가져오기 함수
+  const fetchParticipantCount = async () => {
+    try {
+      if (isSupabaseConnected()) {
         const count = await getParticipantCount()
-        setParticipantCount(count)
-        localStorage.setItem('participantCount', count.toString())
-      } catch (error) {
-        console.error('참여자 수 로드 실패:', error)
+        if (count !== null) {
+          setParticipantCount(count)
+          console.log('✅ Supabase에서 참여자 수 가져옴:', count)
+        }
+      } else {
+        console.log('⚠️ Supabase 연결 없음 - 로컬 카운트 사용')
+        // localStorage에서 복구
         const localCount = localStorage.getItem('participantCount')
         if (localCount) {
           setParticipantCount(parseInt(localCount))
         }
       }
+    } catch (error) {
+      console.log('❌ 참여자 수 가져오기 실패:', error)
+      // localStorage에서 복구
+      const localCount = localStorage.getItem('participantCount')
+      if (localCount) {
+        setParticipantCount(parseInt(localCount))
+      }
     }
+  }
 
-    loadParticipantCount()
+  // 컴포넌트 마운트 시 참여자 수 가져오기
+  useEffect(() => {
+    fetchParticipantCount()
+    
+    // 주기적으로 참여자 수 업데이트 (5초마다)
+    const interval = setInterval(fetchParticipantCount, 5000)
+    
+    return () => clearInterval(interval)
   }, [])
+
+  // 참여자 수가 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    if (participantCount > 0) {
+      localStorage.setItem('participantCount', participantCount.toString())
+    }
+  }, [participantCount])
 
   // URL 파라미터 처리 (결과 공유 링크)
   useEffect(() => {
@@ -331,145 +373,107 @@ function App() {
     initSession()
   }, [])
 
-  // 결과 유형 계산
+  // 결과 계산 함수
   const calculateResultType = (answers) => {
-    if (answers.length !== 9) return 'EGPT'
-
-    // 각 축별로 A/B 답변 수 계산
-    const axisCounts = {
+    if (!answers || answers.length === 0) return 'EGPT'
+    
+    // 각 축별 점수 계산
+    let scores = {
       'E/I': { E: 0, I: 0 },
       'G/C': { G: 0, C: 0 },
       'P/S': { P: 0, S: 0 },
       'T/M': { T: 0, M: 0 }
     }
-
+    
     // 질문별 축 매핑
-    const questionAxisMapping = {
-      0: 'E/I', 1: 'G/C', 2: 'P/S', 3: 'T/M', 4: 'E/I',
-      5: 'G/C', 6: 'P/S', 7: 'T/M', 8: 'E/I'
-    }
-
+    const questionAxisMapping = [
+      'E/I', 'G/C', 'P/S', 'T/M', 'E/I',
+      'G/C', 'P/S', 'T/M', 'E/I'
+    ]
+    
+    // 각 답변에 따라 점수 계산
     answers.forEach((answer, index) => {
       const axis = questionAxisMapping[index]
-      if (answer === 'A') {
-        // A 답변은 첫 번째 성향
-        if (axis === 'E/I') axisCounts[axis].E++
-        else if (axis === 'G/C') axisCounts[axis].G++
-        else if (axis === 'P/S') axisCounts[axis].P++
-        else if (axis === 'T/M') axisCounts[axis].T++
-      } else {
-        // B 답변은 두 번째 성향
-        if (axis === 'E/I') axisCounts[axis].I++
-        else if (axis === 'G/C') axisCounts[axis].C++
-        else if (axis === 'P/S') axisCounts[axis].S++
-        else if (axis === 'T/M') axisCounts[axis].M++
+      if (axis && scores[axis]) {
+        if (answer === 'A') {
+          // A 답변은 첫 번째 성향
+          if (axis === 'E/I') scores[axis].E++
+          else if (axis === 'G/C') scores[axis].G++
+          else if (axis === 'P/S') scores[axis].P++
+          else if (axis === 'T/M') scores[axis].T++
+        } else if (answer === 'B') {
+          // B 답변은 두 번째 성향
+          if (axis === 'E/I') scores[axis].I++
+          else if (axis === 'G/C') scores[axis].C++
+          else if (axis === 'P/S') scores[axis].S++
+          else if (axis === 'T/M') scores[axis].M++
+        }
       }
     })
-
+    
     // 결과 유형 결정
     const resultType = [
-      axisCounts['E/I'].E > axisCounts['E/I'].I ? 'E' : 'I',
-      axisCounts['G/C'].G > axisCounts['G/C'].C ? 'G' : 'C',
-      axisCounts['P/S'].P > axisCounts['P/S'].S ? 'P' : 'S',
-      axisCounts['T/M'].T > axisCounts['T/M'].M ? 'T' : 'M'
+      scores['E/I'].E > scores['E/I'].I ? 'E' : 'I',
+      scores['G/C'].G > scores['G/C'].C ? 'G' : 'C',
+      scores['P/S'].P > scores['P/S'].S ? 'P' : 'S',
+      scores['T/M'].T > scores['T/M'].M ? 'T' : 'M'
     ].join('')
-
+    
     return resultType
   }
 
   // 답변 선택 처리
-  const selectAnswer = async (answer) => {
+  const selectAnswer = (answer) => {
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
-
+    
     if (newAnswers.length === 9) {
-      // 모든 질문 답변 완료
+      // 모든 질문에 답변 완료
       const resultType = calculateResultType(newAnswers)
       const resultData = rollBtiResults[resultType] || rollBtiResults['EGPT']
       
       setResult(resultData)
       setCurrentPage('result')
-
+      
+      // 참여자 수 증가
+      incrementParticipantCount()
+      
       // Supabase에 데이터 저장
-      if (sessionId && isSupabaseConnected()) {
-        try {
-          // 답변 저장
-          await saveUserAnswers(sessionId, newAnswers)
-          
-          // 축별 점수 계산
-          const axisScores = {
-            'E/I': { E: 0, I: 0, total: 0 },
-            'G/C': { G: 0, C: 0, total: 0 },
-            'P/S': { P: 0, S: 0, total: 0 },
-            'T/M': { T: 0, M: 0, total: 0 }
-          }
-
-          const questionAxisMapping = {
-            0: 'E/I', 1: 'G/C', 2: 'P/S', 3: 'T/M', 4: 'E/I',
-            5: 'G/C', 6: 'P/S', 7: 'T/M', 8: 'E/I'
-          }
-
-          newAnswers.forEach((answer, index) => {
-            const axis = questionAxisMapping[index]
-            if (answer === 'A') {
-              if (axis === 'E/I') axisScores[axis].E++
-              else if (axis === 'G/C') axisScores[axis].G++
-              else if (axis === 'P/S') axisScores[axis].P++
-              else if (axis === 'T/M') axisScores[axis].T++
-            } else {
-              if (axis === 'E/I') axisScores[axis].I++
-              else if (axis === 'G/C') axisScores[axis].C++
-              else if (axis === 'P/S') axisScores[axis].S++
-              else if (axis === 'T/M') axisScores[axis].M++
-            }
-            axisScores[axis].total++
-          })
-
-          // 결과 저장
-          await saveUserResult(sessionId, resultType, resultData.title, axisScores)
-          
-          // 세션 완료 처리
-          await completeUserSession(sessionId)
-          
-          // 참여자 수 증가
-          await incrementParticipantCount()
-          
-          console.log('✅ 테스트 완료 데이터 저장 완료')
-        } catch (error) {
-          console.error('❌ 데이터 저장 실패:', error)
-        }
+      if (sessionId) {
+        saveUserAnswers(sessionId, newAnswers)
+        saveUserResult(sessionId, resultType, resultData.title, {
+          'E/I': { E: 0, I: 0, total: 0 },
+          'G/C': { G: 0, C: 0, total: 0 },
+          'P/S': { P: 0, S: 0, total: 0 },
+          'T/M': { T: 0, M: 0, total: 0 }
+        })
+        completeUserSession(sessionId)
       }
-
-      // URL 업데이트
-      const newUrl = `${window.location.origin}${window.location.pathname}?result=${resultType}`
-      window.history.pushState({}, '', newUrl)
     } else {
       setCurrentQuestion(newAnswers.length)
     }
   }
 
-  // 테스트 재시작
-  const restartTest = async () => {
-    // 행동 추적
-    if (sessionId && isSupabaseConnected()) {
-      await trackUserAction(sessionId, 'restart_clicked', { 
-        previous_result: result?.type,
-        restart_count: 1
-      })
-    }
+  // 테스트 시작 함수
+  const startTest = () => {
+    setCurrentPage('question')
+    setCurrentQuestion(0)
+    setAnswers([])
+    setResult(null)
+  }
 
-    setCurrentPage('main') // 홈화면으로 이동
+  // 테스트 재시작 함수
+  const restartTest = () => {
+    setCurrentPage('main')
     setCurrentQuestion(0)
     setAnswers([])
     setResult(null)
     
     // 새로운 세션 생성
-    if (isSupabaseConnected()) {
-      const newSessionId = await createUserSession()
-      if (newSessionId) {
-        setSessionId(newSessionId)
-      }
+    if (sessionId) {
+      trackUserAction(sessionId, 'restart_clicked')
     }
+    initSession()
   }
 
   // 결과 공유
@@ -501,24 +505,26 @@ function App() {
   // 메인 페이지 렌더링
   const renderMainPage = () => (
     <div className="main-page">
-      <div className="title-section">
-        <h1 className="title">롤 BTI</h1>
+      <div className="main-content">
+        <h1 className="title">롤BTI</h1>
+        <p className="subtitle">나의 롤 플레이 스타일을 알아보자!</p>
+        
+        {/* 이모지 애니메이션 영역 */}
         <div className="emoji-container">
           <span className="emoji">🎮</span>
           <span className="emoji">⚔️</span>
           <span className="emoji">🏆</span>
         </div>
-        <p className="subtitle">나만의 롤 플레이 스타일을 알아보세요!</p>
+        
+        {/* 참여자 수 표시 */}
+        <div className="participant-count">
+          지금까지 {participantCount}명이 참여했어요!
+        </div>
+        
+        <button className="start-btn" onClick={startTest}>
+          시작하기
+        </button>
       </div>
-      
-      {/* 참여자 수 표시 */}
-      <div className="participant-count">
-        <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요</p>
-      </div>
-      
-      <button className="start-btn" onClick={() => setCurrentPage('question')}>
-        시작하기
-      </button>
     </div>
   )
 
