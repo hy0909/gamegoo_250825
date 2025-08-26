@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import BarChart from './BarChart'
 import { supabase, generateSessionId, getUtmParams, isSupabaseConnected, getParticipantCount, incrementParticipantCount } from './supabase'
@@ -10,63 +10,63 @@ const rollBtiQuestions = [
     question: "블리츠크랭크가 인베 가자고 하면?", 
     optionA: "무조건 따라감", 
     optionB: "가볍게 무시", 
-    axis: 'EI' 
+    axis: ['E', 'I'] 
   },
   { 
     id: 2, 
     question: "게임 초반 운영은?", 
     optionA: "초반 압박으로 굴린다", 
     optionB: "안전하게 성장", 
-    axis: 'SP' 
+    axis: ['S', 'P'] 
   },
   { 
     id: 3, 
     question: "초반 킬각이 보이면?", 
     optionA: "무조건 싸운다", 
     optionB: "안정적으로 간다", 
-    axis: 'SP' 
+    axis: ['S', 'P'] 
   },
   { 
     id: 4, 
     question: "블루 버프를 먹고 싶은 다른 팀원이 있다면?", 
     optionA: "이미 내가 먹었다", 
     optionB: "양보한다", 
-    axis: 'GC' 
+    axis: ['G', 'C'] 
   },
   { 
     id: 5, 
-    question: "용/바론 한타 콜이 오면?", 
-    optionA: "무조건 달려간다", 
-    optionB: "라인 클리어부터 한다", 
-    axis: 'EI' 
-  },
-  { 
-    id: 6, 
-    question: "한타 중, 적 딜러가 눈앞에 있다면?", 
-    optionA: "즉시 진입", 
-    optionB: "포지션 유지", 
-    axis: 'EI' 
-  },
-  { 
-    id: 7, 
-    question: "내가 0/3/0 이 되었을 때?", 
-    optionA: "침착하고 안정적으로 플레이", 
-    optionB: "역전을 노린다, 과감한 플레이", 
-    axis: 'TM' 
-  },
-  { 
-    id: 8, 
-    question: "연패 중일 때 나는?", 
-    optionA: "큐 돌려!", 
-    optionB: "쉬었다 한다", 
-    axis: 'TM' 
-  },
-  { 
-    id: 9, 
     question: "제어와드 막타는?", 
     optionA: "팀원에게 양보한다", 
     optionB: "내가 먹는다", 
-    axis: 'GC' 
+    axis: ['C', 'G'] 
+  },
+  { 
+    id: 6, 
+    question: "용 or 바론 한타 콜이 오면?", 
+    optionA: "무조건 달려간다", 
+    optionB: "라인 클리어부터 한다", 
+    axis: ['E', 'I'] 
+  },
+  { 
+    id: 7, 
+    question: "한타 중, 적 딜러가 눈앞에 있다면?", 
+    optionA: "즉시 진입", 
+    optionB: "포지션 유지", 
+    axis: ['E', 'I'] 
+  },
+  { 
+    id: 8, 
+    question: "내가 0/3/0 이 되었을 때?", 
+    optionA: "침착하고 안정적으로 플레이", 
+    optionB: "역전을 노린다, 과감한 플레이", 
+    axis: ['T', 'M'] 
+  },
+  { 
+    id: 9, 
+    question: "연패 중일 때 나는?", 
+    optionA: "큐 돌려!", 
+    optionB: "쉬었다 한다", 
+    axis: ['T', 'M'] 
   }
 ]
 
@@ -282,6 +282,46 @@ function App() {
     utm_campaign: urlParams.get('utm_campaign')
   }
 
+  // Supabase에서 직접 참여자 수 가져오기 (새로고침 시 초기화 방지)
+  const loadParticipantCountFromSupabase = useCallback(async () => {
+    try {
+      console.log('🚀 Supabase에서 참여자 수 직접 가져오기 시작...')
+      setIsLoading(true)
+      
+      // 무조건 Supabase에서 최신 수 가져오기
+      const supabaseCount = await getParticipantCount()
+      console.log('✅ Supabase에서 가져온 참여자 수:', supabaseCount)
+      
+      if (supabaseCount > 0) {
+        // Supabase 수가 현재보다 크거나 같으면 업데이트 (절대 줄어들지 않음)
+        setParticipantCount(prevCount => {
+          if (supabaseCount >= prevCount) {
+            console.log('✅ 참여자 수 업데이트:', prevCount, '→', supabaseCount)
+            localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
+            setLastSyncTime(new Date().toLocaleTimeString())
+            return supabaseCount
+          } else {
+            // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
+            console.log('🛡️ 참여자 수 보호: Supabase 수가 작음, 현재 수 유지:', prevCount)
+            setLastSyncTime(new Date().toLocaleTimeString())
+            return prevCount
+          }
+        })
+      } else {
+        // Supabase에 데이터가 없으면 현재 수 유지 (절대 초기화 안함)
+        console.log('🛡️ 참여자 수 보호: Supabase에 데이터 없음, 현재 수 유지')
+        setLastSyncTime(new Date().toLocaleTimeString())
+      }
+      
+    } catch (error) {
+      console.error('❌ Supabase에서 참여자 수 가져오기 실패:', error)
+      // 에러 시에도 현재 수 유지 (절대 초기화 안함)
+      console.log('🛡️ 에러 발생 시에도 참여자 수 보호')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   // 앱 초기화
   useEffect(() => {
     console.log('=== 앱 초기화 시작 ===')
@@ -292,6 +332,11 @@ function App() {
     if (resultParam && rollBtiResults[resultParam]) {
       setResult(rollBtiResults[resultParam])
       setCurrentPage('result')
+      
+      // URL 파라미터로 접근한 경우 기본 answers 배열 생성 (디버깅용)
+      const defaultAnswers = ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A']
+      setAnswers(defaultAnswers)
+      
       logPageVisit('result', resultParam)
     } else {
       // 메인 페이지 방문 로그
@@ -301,7 +346,7 @@ function App() {
         loadParticipantCountFromSupabase()
       }, 50) // 0.1초 → 0.05초로 단축
     }
-  }, [])
+  }, [loadParticipantCountFromSupabase])
 
   // 참여자 수 실시간 폴링 (0.5초마다 - 새로고침 후 빠른 동기화)
   useEffect(() => {
@@ -310,81 +355,78 @@ function App() {
     }, 500) // 1초마다
     
     return () => clearInterval(interval)
-  }, [])
-
-  // Supabase에서 직접 참여자 수 가져오기 (새로고침 시 초기화 방지)
-  const loadParticipantCountFromSupabase = async () => {
-    try {
-      console.log('🚀 Supabase에서 참여자 수 직접 가져오기 시작...')
-      console.log('현재 참여자 수:', participantCount)
-      setIsLoading(true)
-      
-      // 무조건 Supabase에서 최신 수 가져오기
-      const supabaseCount = await getParticipantCount()
-      console.log('✅ Supabase에서 가져온 참여자 수:', supabaseCount)
-      
-      if (supabaseCount > 0) {
-        // Supabase 수가 현재보다 크거나 같으면 업데이트 (절대 줄어들지 않음)
-        if (supabaseCount >= participantCount) {
-          console.log('✅ 참여자 수 업데이트:', participantCount, '→', supabaseCount)
-          setParticipantCount(supabaseCount)
-          localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
-          setLastSyncTime(new Date().toLocaleTimeString())
-        } else {
-          // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
-          console.log('🛡️ 참여자 수 보호: Supabase 수가 작음, 현재 수 유지:', participantCount)
-          setLastSyncTime(new Date().toLocaleTimeString())
-        }
-      } else {
-        // Supabase에 데이터가 없으면 현재 수 유지 (절대 초기화 안함)
-        console.log('🛡️ 참여자 수 보호: Supabase에 데이터 없음, 현재 수 유지:', participantCount)
-        setLastSyncTime(new Date().toLocaleTimeString())
-      }
-      
-    } catch (error) {
-      console.error('❌ Supabase에서 참여자 수 가져오기 실패:', error)
-      // 에러 시에도 현재 수 유지 (절대 초기화 안함)
-      console.log('🛡️ 에러 발생 시에도 참여자 수 보호:', participantCount)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // 참여자 수 로드 함수 (URL 파라미터 우선 - 완전히 다른 방식)
-  const loadParticipantCount = async () => {
-    try {
-      console.log('🔄 참여자 수 로드 시작...')
-      console.log('현재 참여자 수:', participantCount)
-      
-      // Supabase에서 최신 수 가져오기
-      const supabaseCount = await getParticipantCount()
-      console.log('Supabase에서 가져온 수:', supabaseCount)
-      
-      if (supabaseCount > 0) {
-        // Supabase 수가 현재보다 크면 업데이트 (절대 줄어들지 않음)
-        if (supabaseCount > participantCount) {
-          console.log('✅ 참여자 수 업데이트:', participantCount, '→', supabaseCount)
-          updateParticipantCount(supabaseCount) // 새로운 함수 사용
-        } else if (supabaseCount === participantCount) {
-          console.log('✅ 참여자 수 동일, 동기화 완료:', supabaseCount)
-          setLastSyncTime(new Date().toLocaleTimeString())
-        } else {
-          // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
-          console.log('🛡️ 참여자 수 보호: Supabase 수가 작음, 현재 수 유지:', participantCount)
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ 참여자 수 로드 실패:', error)
-      // 에러 시에도 현재 수 유지 (절대 초기화 안함)
-      console.log('🛡️ 에러 발생 시에도 참여자 수 보호:', participantCount)
-    }
-  }
+  }, [loadParticipantCountFromSupabase])
 
   // 강제 동기화 함수 (Supabase에서 직접 가져오기)
   const forceSync = async () => {
     console.log('🚀 강제 동기화 시작...')
     await loadParticipantCountFromSupabase()
+  }
+
+  // 페이지 방문 로그
+  const logPageVisit = (page, resultType = null) => {
+    try {
+      if (isSupabaseConnected()) {
+        const logData = {
+          session_id: sessionId,
+          page: page,
+          result_type: resultType,
+          utm_source: utmParams.utm_source,
+          utm_medium: utmParams.utm_medium,
+          utm_campaign: utmParams.utm_campaign,
+          timestamp: new Date().toISOString()
+        }
+        
+        // Supabase에 로그 저장
+        supabase.from('page_visits').insert([logData])
+          .then(() => console.log('✅ 페이지 방문 로그 저장됨:', page))
+          .catch(error => console.error('❌ 페이지 방문 로그 저장 실패:', error))
+      }
+    } catch (error) {
+      console.error('❌ 로그 저장 중 에러:', error)
+    }
+  }
+
+  // 테스트 재시작 로그
+  const logTestRestart = () => {
+    try {
+      if (isSupabaseConnected()) {
+        const logData = {
+          session_id: sessionId,
+          action: 'test_restart',
+          timestamp: new Date().toISOString()
+        }
+        
+        supabase.from('user_actions').insert([logData])
+          .then(() => console.log('✅ 테스트 재시작 로그 저장됨'))
+          .catch(error => console.error('❌ 테스트 재시작 로그 저장 실패:', error))
+      }
+    } catch (error) {
+      console.error('❌ 로그 저장 중 에러:', error)
+    }
+  }
+
+  // 테스트 결과 저장
+  const saveTestResult = (resultType, answers) => {
+    try {
+      if (isSupabaseConnected()) {
+        const resultData = {
+          session_id: sessionId,
+          result_type: resultType,
+          answers: answers.join(','),
+          utm_source: utmParams.utm_source,
+          utm_medium: utmParams.utm_medium,
+          utm_campaign: utmParams.utm_campaign,
+          timestamp: new Date().toISOString()
+        }
+        
+        supabase.from('user_test_results').insert([resultData])
+          .then(() => console.log('✅ 테스트 결과 저장됨:', resultType))
+          .catch(error => console.error('❌ 테스트 결과 저장 실패:', error))
+      }
+    } catch (error) {
+      console.error('❌ 결과 저장 중 에러:', error)
+    }
   }
 
   // 참여자 수 증가 함수 (Supabase에서 직접 가져오기)
@@ -405,27 +447,6 @@ function App() {
       // 에러 시에도 Supabase에서 다시 가져오기 시도
       await loadParticipantCountFromSupabase()
     }
-  }
-
-  // 참여자 수 업데이트 함수 (URL 파라미터도 함께 업데이트)
-  const updateParticipantCount = (newCount) => {
-    console.log('🔄 참여자 수 업데이트:', participantCount, '→', newCount)
-    
-    // 1. 상태 업데이트
-    setParticipantCount(newCount)
-    
-    // 2. localStorage 저장
-    localStorage.setItem('gamegoo_participant_count', newCount.toString())
-    
-    // 3. URL 파라미터 업데이트 (다른 기기에서도 동일한 수 표시)
-    const params = new URLSearchParams(window.location.search)
-    params.set('count', newCount.toString())
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
-    
-    // 4. 마지막 동기화 시간 업데이트
-    setLastSyncTime(new Date().toLocaleTimeString())
-    
-    console.log('✅ 참여자 수 업데이트 완료, URL 파라미터도 업데이트됨')
   }
 
   // 테스트 재시작 (참여자 수는 절대 건드리지 않음)
@@ -533,18 +554,6 @@ function App() {
       {/* 참여자 수 표시 */}
       <div className="participant-count">
         <p>지금까지 <span className="count-highlight">{participantCount.toLocaleString()}</span>명이 참여했어요</p>
-        <div className="sync-info">
-          <button 
-            className={`sync-btn ${isLoading ? 'loading' : ''}`} 
-            onClick={forceSync}
-            disabled={isLoading}
-          >
-            {isLoading ? '🔄 동기화 중...' : '🔄 동기화'}
-          </button>
-          {lastSyncTime && (
-            <span className="last-sync">마지막 동기화: {lastSyncTime}</span>
-          )}
-        </div>
       </div>
       
       <button className="start-btn" onClick={() => setCurrentPage('question')}>
@@ -596,6 +605,9 @@ function App() {
           <div className="mbti-type">{result.type}</div>
           <h2 className="mbti-title">{result.title}</h2>
           
+          {/* 명대사 - 제목 없이 바로 표시 */}
+          <p className="mbti-quote">{result.quote}</p>
+          
           {/* 대표 챔피언 프로필 */}
           <div className="champion-profiles">
             {result.champions.split(', ').slice(0, 2).map((champion, index) => (
@@ -633,10 +645,6 @@ function App() {
             <div className="detail-section">
               <h3>🚫 피해야 할 유형</h3>
               <p>{result.avoidWith}</p>
-            </div>
-            <div className="detail-section">
-              <h3>💬 명대사</h3>
-              <p className="quote">{result.quote}</p>
             </div>
           </div>
         </div>
