@@ -1,72 +1,66 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 환경 변수 확인
+// Supabase 클라이언트 생성
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase 환경 변수가 설정되지 않았습니다. 기본 기능만 작동합니다.')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 console.log('🔍 Supabase 환경 변수 확인:')
 console.log('VITE_SUPABASE_URL:', supabaseUrl ? '✅ 설정됨' : '❌ 설정되지 않음')
 console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ 설정됨' : '❌ 설정되지 않음')
 
-// Supabase 클라이언트 생성
-let supabase = null
 if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey)
   console.log('✅ Supabase 클라이언트 생성 완료')
 } else {
-  console.warn('⚠️ Supabase 환경 변수가 설정되지 않았습니다. 기본 기능만 작동합니다.')
+  console.log('❌ Supabase 클라이언트 생성 실패')
 }
 
-// Supabase 연결 상태 확인
-export const isSupabaseConnected = () => {
-  return supabase !== null
-}
-
-// 참여자 수 조회 (기존 함수 유지)
+// 전체 참여자 수 가져오기 (테스트 완료한 사용자 수)
 export const getParticipantCount = async () => {
-  if (!isSupabaseConnected()) {
-    console.warn('Supabase 연결 없음 - 기본값 반환')
-    return 4
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('overall_stats')
-      .select('total_participants')
-      .eq('id', 1)
-      .single()
-
-    if (error) {
-      console.error('참여자 수 조회 오류:', error)
-      return 4
+    if (!supabase) {
+      console.log('❌ Supabase 클라이언트가 없습니다')
+      return null
     }
 
-    return data?.total_participants || 4
+    // user_sessions 테이블에서 completed = true인 세션 수를 가져옴
+    const { data, error, count } = await supabase
+      .from('user_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('completed', true)
+
+    if (error) {
+      console.error('❌ 참여자 수 조회 실패:', error)
+      return null
+    }
+
+    console.log('✅ Supabase에서 참여자 수 조회:', count)
+    return count || 0
   } catch (error) {
-    console.error('참여자 수 조회 예외:', error)
-    return 4
+    console.error('❌ 참여자 수 조회 중 오류:', error)
+    return null
   }
 }
 
-// 참여자 수 증가 (기존 함수 유지)
+// 참여자 수 증가 (테스트 완료 시)
 export const incrementParticipantCount = async () => {
-  if (!isSupabaseConnected()) {
-    console.warn('Supabase 연결 없음 - 증가 건너뜀')
-    return false
-  }
-
   try {
-    const { error } = await supabase
-      .rpc('increment_participant_count_safe')
-
-    if (error) {
-      console.error('참여자 수 증가 오류:', error)
+    if (!supabase) {
+      console.log('❌ Supabase 클라이언트가 없습니다')
       return false
     }
 
+    // 새로운 완료된 세션을 추가하는 대신, 기존 세션을 completed = true로 업데이트
+    // 이 함수는 실제로는 호출되지 않고, completeUserSession에서 처리됨
+    console.log('✅ 참여자 수 증가 처리됨')
     return true
   } catch (error) {
-    console.error('참여자 수 증가 예외:', error)
+    console.error('❌ 참여자 수 증가 실패:', error)
     return false
   }
 }
@@ -75,7 +69,7 @@ export const incrementParticipantCount = async () => {
 
 // 1. 사용자 세션 생성
 export const createUserSession = async () => {
-  if (!isSupabaseConnected()) return null
+  if (!supabase) return null
 
   try {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -100,7 +94,7 @@ export const createUserSession = async () => {
 
 // 2. 사용자 답변 저장
 export const saveUserAnswers = async (sessionId, answers) => {
-  if (!isSupabaseConnected() || !sessionId || !answers) return false
+  if (!supabase || !sessionId || !answers) return false
 
   try {
     // 질문별 축 매핑
@@ -134,7 +128,7 @@ export const saveUserAnswers = async (sessionId, answers) => {
 
 // 3. 사용자 결과 저장
 export const saveUserResult = async (sessionId, resultType, resultTitle, axisScores) => {
-  if (!isSupabaseConnected() || !sessionId) return false
+  if (!supabase || !sessionId) return false
 
   try {
     const { error } = await supabase
@@ -160,7 +154,7 @@ export const saveUserResult = async (sessionId, resultType, resultTitle, axisSco
 
 // 4. 사용자 행동 추적
 export const trackUserAction = async (sessionId, actionType, actionData = null) => {
-  if (!isSupabaseConnected() || !sessionId) return false
+  if (!supabase || !sessionId) return false
 
   try {
     const { error } = await supabase
@@ -185,7 +179,7 @@ export const trackUserAction = async (sessionId, actionType, actionData = null) 
 
 // 5. 세션 완료 처리
 export const completeUserSession = async (sessionId) => {
-  if (!isSupabaseConnected() || !sessionId) return false
+  if (!supabase || !sessionId) return false
 
   try {
     const { error } = await supabase
@@ -210,7 +204,7 @@ export const completeUserSession = async (sessionId) => {
 
 // 6. 전체 통계 조회
 export const getOverallStats = async () => {
-  if (!isSupabaseConnected()) return null
+  if (!supabase) return null
 
   try {
     const { data, error } = await supabase
@@ -233,7 +227,7 @@ export const getOverallStats = async () => {
 
 // 7. 축별 통계 조회
 export const getAxisStatistics = async () => {
-  if (!isSupabaseConnected()) return null
+  if (!supabase) return null
 
   try {
     const { data, error } = await supabase
@@ -251,6 +245,4 @@ export const getAxisStatistics = async () => {
     console.error('축별 통계 조회 예외:', error)
     return null
   }
-}
-
-export { supabase } 
+} 

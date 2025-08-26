@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import BarChart from './BarChart'
 import { 
-  isSupabaseConnected, 
+  supabase,
   getParticipantCount, 
   incrementParticipantCount,
   createUserSession,
@@ -18,7 +18,7 @@ function App() {
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
-  const [participantCount, setParticipantCount] = useState(4)
+  const [participantCount, setParticipantCount] = useState(0)
   const [sessionId, setSessionId] = useState(null)
 
   // 롤BTI 질문 데이터
@@ -342,8 +342,8 @@ function App() {
   useEffect(() => {
     fetchParticipantCount()
     
-    // 주기적으로 참여자 수 업데이트 (5초마다)
-    const interval = setInterval(fetchParticipantCount, 5000)
+    // 더 자주 참여자 수 업데이트 (3초마다)
+    const interval = setInterval(fetchParticipantCount, 3000)
     
     return () => clearInterval(interval)
   }, [])
