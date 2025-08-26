@@ -41,25 +41,25 @@ export async function initSession(sessionId) {
 
     console.log('🔍 Supabase 연결 상태:', supabase ? '연결됨' : '연결 안됨')
 
-    // page_visits 테이블에 방문 기록
+    // rollbti_sessions 테이블에 새 세션 생성
     const { data, error } = await supabase
-      .from('page_visits')
+      .from('rollbti_sessions')
       .insert([
         { 
           session_id: sessionId,
-          page_name: 'rollbti_test',
-          visited_at: new Date().toISOString()
+          started_at: new Date().toISOString(),
+          is_completed: false
         }
       ])
       .select()
 
     if (error) {
-      console.warn('⚠️ 방문 기록 저장 실패:', error.message)
+      console.warn('⚠️ 세션 생성 실패:', error.message)
       console.log('🔍 에러 상세:', error)
       return sessionId
     }
 
-    console.log('✅ 방문 기록 저장 성공:', data)
+    console.log('✅ 세션 생성 성공:', data)
     return sessionId
   } catch (error) {
     console.warn('⚠️ 세션 생성 실패:', error.message)
@@ -77,17 +77,18 @@ export async function saveUserAnswers(sessionId, answers) {
 
     console.log('🔍 답변 저장 시도:', { sessionId, answers })
 
-    // rollbti_simple 테이블에 답변 저장
+    // rollbti_answers 테이블에 답변 저장
+    const answerData = answers.map((answer, index) => ({
+      session_id: sessionId,
+      question_number: index + 1,
+      answer: answer,
+      axis_type: getAxisType(index), // 질문 번호에 따른 축 타입
+      created_at: new Date().toISOString()
+    }))
+
     const { data, error } = await supabase
-      .from('rollbti_simple')
-      .insert([
-        {
-          session_id: sessionId,
-          data_type: 'answers',
-          data_content: answers,
-          created_at: new Date().toISOString()
-        }
-      ])
+      .from('rollbti_answers')
+      .insert(answerData)
       .select()
 
     if (error) {
@@ -104,6 +105,22 @@ export async function saveUserAnswers(sessionId, answers) {
   }
 }
 
+// 질문 번호에 따른 축 타입 반환
+function getAxisType(questionIndex) {
+  const axisMap = [
+    'E/I',    // 0번 질문
+    'S/P',    // 1번 질문
+    'S/P',    // 2번 질문
+    'G/C',    // 3번 질문
+    'G/C',    // 4번 질문
+    'E/I',    // 5번 질문
+    'E/I',    // 6번 질문
+    'T/M',    // 7번 질문
+    'T/M'     // 8번 질문
+  ]
+  return axisMap[questionIndex] || 'E/I'
+}
+
 // 사용자 결과 저장
 export async function saveUserResult(sessionId, resultType, resultTitle, axisScores) {
   try {
@@ -114,18 +131,15 @@ export async function saveUserResult(sessionId, resultType, resultTitle, axisSco
 
     console.log('🔍 결과 저장 시도:', { sessionId, resultType, resultTitle, axisScores })
 
-    // rollbti_simple 테이블에 결과 저장
+    // rollbti_results 테이블에 결과 저장
     const { data, error } = await supabase
-      .from('rollbti_simple')
+      .from('rollbti_results')
       .insert([
         {
           session_id: sessionId,
-          data_type: 'result',
-          data_content: {
-            type: resultType,
-            title: resultTitle,
-            axis_scores: axisScores
-          },
+          result_type: resultType,
+          result_title: resultTitle,
+          axis_scores: axisScores,
           created_at: new Date().toISOString()
         }
       ])
@@ -155,17 +169,14 @@ export async function completeUserSession(sessionId) {
 
     console.log('🔍 세션 완료 처리 시도:', sessionId)
 
-    // rollbti_simple 테이블에 완료 기록
+    // rollbti_sessions 테이블에서 세션 완료 처리
     const { data, error } = await supabase
-      .from('rollbti_simple')
-      .insert([
-        {
-          session_id: sessionId,
-          data_type: 'completed',
-          data_content: { completed: true },
-          created_at: new Date().toISOString()
-        }
-      ])
+      .from('rollbti_sessions')
+      .update({ 
+        is_completed: true,
+        completed_at: new Date().toISOString()
+      })
+      .eq('session_id', sessionId)
       .select()
 
     if (error) {
@@ -182,7 +193,7 @@ export async function completeUserSession(sessionId) {
   }
 }
 
-// 참여자 수 증가
+// 참여자 수 증가 (실시간 집계)
 export async function incrementParticipantCount() {
   try {
     if (!supabase) {
@@ -194,57 +205,15 @@ export async function incrementParticipantCount() {
       return newCount;
     }
 
-    console.log('🔍 참여자 수 증가 시도 (Supabase)')
+    console.log('🔍 참여자 수 증가 시도 (Supabase 실시간 집계)')
 
-    // rollbti_simple 테이블에서 participant_count 증가
-    // 먼저 현재 값을 조회
-    const { data: currentData, error: selectError } = await supabase
-      .from('rollbti_simple')
-      .select('participant_count')
-      .eq('id', 1)
-      .single()
+    // Supabase 함수를 통한 참여자 수 증가
+    const { data, error } = await supabase
+      .rpc('increment_participant_count')
 
-    if (selectError) {
-      console.warn('⚠️ 현재 참여자 수 조회 실패:', selectError.message)
-      // 새로운 레코드 생성
-      const { data: insertData, error: insertError } = await supabase
-        .from('rollbti_simple')
-        .insert([
-          {
-            id: 1,
-            participant_count: 1,
-            data_type: 'stats',
-            created_at: new Date().toISOString()
-          }
-        ])
-        .select()
-
-      if (insertError) {
-        console.warn('⚠️ 참여자 수 초기화 실패:', insertError.message)
-        // 로컬 폴백
-        const currentCount = parseInt(localStorage.getItem('participantCount') || '0', 10);
-        const newCount = currentCount + 1;
-        localStorage.setItem('participantCount', newCount.toString());
-        return newCount;
-      }
-
-      console.log('✅ 참여자 수 초기화 성공:', insertData)
-      return 1
-    }
-
-    // 기존 값 증가
-    const currentCount = currentData.participant_count || 0
-    const newCount = currentCount + 1
-
-    const { data: updateData, error: updateError } = await supabase
-      .from('rollbti_simple')
-      .update({ participant_count: newCount })
-      .eq('id', 1)
-      .select()
-
-    if (updateError) {
-      console.warn('⚠️ 참여자 수 증가 실패:', updateError.message)
-      console.log('🔍 에러 상세:', updateError)
+    if (error) {
+      console.warn('⚠️ 참여자 수 증가 실패:', error.message)
+      console.log('🔍 에러 상세:', error)
       // 로컬 폴백
       const currentCount = parseInt(localStorage.getItem('participantCount') || '0', 10);
       const newCount = currentCount + 1;
@@ -252,8 +221,12 @@ export async function incrementParticipantCount() {
       return newCount;
     }
 
-    console.log('✅ 참여자 수 증가 성공:', updateData)
-    return newCount
+    console.log('✅ 참여자 수 증가 성공 (실시간 집계):', data)
+    
+    // localStorage에도 저장 (동기화)
+    localStorage.setItem('participantCount', data.toString());
+    
+    return data
   } catch (error) {
     console.warn('⚠️ 참여자 수 증가 실패:', error.message)
     // 로컬 폴백
@@ -264,7 +237,7 @@ export async function incrementParticipantCount() {
   }
 }
 
-// 참여자 수 가져오기
+// 참여자 수 가져오기 (실시간 집계)
 export async function getParticipantCount() {
   try {
     if (!supabase) {
@@ -273,12 +246,12 @@ export async function getParticipantCount() {
       return count;
     }
 
-    console.log('🔍 참여자 수 조회 시도 (Supabase)')
+    console.log('🔍 참여자 수 조회 시도 (Supabase 실시간 집계)')
 
-    // rollbti_simple 테이블에서 참여자 수 조회
+    // rollbti_global_stats 테이블에서 실시간 참여자 수 조회
     const { data, error } = await supabase
-      .from('rollbti_simple')
-      .select('participant_count')
+      .from('rollbti_global_stats')
+      .select('total_participants')
       .eq('id', 1)
       .single()
 
@@ -290,8 +263,13 @@ export async function getParticipantCount() {
       return count;
     }
 
-    console.log('✅ 참여자 수 조회 성공:', data?.participant_count || 0)
-    return data?.participant_count || 0
+    const totalCount = data?.total_participants || 0
+    console.log('✅ 참여자 수 조회 성공 (실시간 집계):', totalCount)
+    
+    // localStorage 동기화
+    localStorage.setItem('participantCount', totalCount.toString());
+    
+    return totalCount
   } catch (error) {
     console.warn('⚠️ 참여자 수 조회 실패:', error.message)
     // 로컬 폴백
@@ -310,29 +288,34 @@ export async function trackUserAction(sessionId, actionType, actionData = {}) {
 
     console.log('🔍 행동 추적 시도:', { sessionId, actionType, actionData })
 
-    // rollbti_simple 테이블에 행동 기록
-    const { data, error } = await supabase
-      .from('rollbti_simple')
-      .insert([
-        {
-          session_id: sessionId,
-          data_type: 'action',
-          data_content: {
-            action: actionType,
-            ...actionData
-          },
-          created_at: new Date().toISOString()
-        }
-      ])
-      .select()
+    // 전역 통계 업데이트 (공유, 재시작 등)
+    if (actionType === 'share_clicked') {
+      const { error } = await supabase
+        .from('rollbti_global_stats')
+        .update({ 
+          total_shares: supabase.sql`total_shares + 1`,
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', 1)
 
-    if (error) {
-      console.warn('⚠️ 행동 추적 실패:', error.message)
-      console.log('🔍 에러 상세:', error)
-      return false
+      if (error) {
+        console.warn('⚠️ 공유 통계 업데이트 실패:', error.message)
+      }
+    } else if (actionType === 'restart_clicked') {
+      const { error } = await supabase
+        .from('rollbti_global_stats')
+        .update({ 
+          total_restarts: supabase.sql`total_restarts + 1`,
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', 1)
+
+      if (error) {
+        console.warn('⚠️ 재시작 통계 업데이트 실패:', error.message)
+      }
     }
 
-    console.log('✅ 행동 추적 성공:', data)
+    console.log('✅ 행동 추적 성공:', actionType)
     return true
   } catch (error) {
     console.warn('⚠️ 행동 추적 실패:', error.message)

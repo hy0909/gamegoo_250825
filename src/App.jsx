@@ -413,14 +413,30 @@ function App() {
       // 결과 상태 설정
       setResult(resultData);
       
-      // 로컬로만 처리 (Supabase 연결 없음)
+      // Supabase에 데이터 저장 시도
       try {
+        // 답변 저장
+        await saveUserAnswers(sessionId, newAnswers);
+        
+        // 결과 저장
+        await saveUserResult(sessionId, resultType, resultTitle, {});
+        
+        // 세션 완료 처리
+        await completeUserSession(sessionId);
+        
         // 참여자 수 증가
         await incrementParticipantCount();
         
-        console.log('✅ 테스트 완료 및 로컬 데이터 저장 성공');
+        console.log('✅ 테스트 완료 및 Supabase 데이터 저장 성공');
       } catch (error) {
-        console.warn('⚠️ 로컬 데이터 저장 실패:', error);
+        console.warn('⚠️ Supabase 데이터 저장 실패:', error);
+        
+        // 로컬 폴백: 참여자 수만 증가
+        try {
+          await incrementParticipantCount();
+        } catch (localError) {
+          console.warn('⚠️ 로컬 참여자 수 증가도 실패:', localError);
+        }
       }
 
       setCurrentPage('result');
@@ -446,6 +462,11 @@ function App() {
     
     // 새로운 세션 생성
     initSession()
+    
+    // 재시작 행동 추적
+    if (sessionId) {
+      trackUserAction(sessionId, 'restart_clicked')
+    }
   }
 
   // 결과 공유
@@ -456,6 +477,14 @@ function App() {
       try {
         await navigator.clipboard.writeText(shareUrl)
         setShareMessage('링크가 복사되었습니다!')
+        
+        // 공유 행동 추적
+        if (sessionId) {
+          trackUserAction(sessionId, 'share_clicked', {
+            shared_result: result.type,
+            share_url: shareUrl
+          })
+        }
         
         setTimeout(() => setShareMessage(''), 3000)
       } catch (error) {
