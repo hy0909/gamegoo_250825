@@ -2,10 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import BarChart from './BarChart'
 import { 
-  supabase,
   getParticipantCount, 
   incrementParticipantCount,
-  createUserSession,
+  initSession,
   saveUserAnswers,
   saveUserResult,
   trackUserAction,
@@ -273,7 +272,7 @@ function App() {
   const initSession = async () => {
     try {
       if (isSupabaseConnected()) {
-        const newSessionId = await createUserSession()
+        const newSessionId = await initSession()
         if (newSessionId) {
           setSessionId(newSessionId)
           console.log('✅ Supabase 세션 생성:', newSessionId)
@@ -480,7 +479,7 @@ function App() {
         {/* 참여자 수 표시 */}
         <div className="participant-count">
           지금까지 {participantCount}명이 참여했어요!
-        </div>
+      </div>
         
         <button className="start-btn" onClick={startTest}>
           시작하기
