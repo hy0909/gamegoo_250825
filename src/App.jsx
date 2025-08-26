@@ -29,52 +29,52 @@ function App() {
       axis: ['E', 'I']
     },
     {
-      question: "초반 운영에서 중요한 것은?",
-      optionA: "안전한 파밍과 시야 확보",
-      optionB: "적극적인 로밍과 갱킹",
+      question: "게임 초반 운영은?",
+      optionA: "초반 압박으로 굴린다",
+      optionB: "안전하게 성장",
+      axis: ['S', 'P']
+    },
+    {
+      question: "초반 킬각이 보이면?",
+      optionA: "무조건 싸운다",
+      optionB: "안정적으로 간다",
+      axis: ['S', 'P']
+    },
+    {
+      question: "블루 버프를 먹고 싶은 다른 팀원이 있다면?",
+      optionA: "이미 내가 먹었다",
+      optionB: "양보한다",
       axis: ['G', 'C']
     },
     {
-      question: "초반에 킬각이 보이면?",
-      optionA: "신중하게 판단하고 기회만 노림",
-      optionB: "즉시 달려가서 싸움을 시작",
-      axis: ['P', 'S']
+      question: "제어와드 막타는?",
+      optionA: "팀원에게 양보한다",
+      optionB: "내가 먹는다",
+      axis: ['C', 'G']
     },
     {
-      question: "블루 버프를 먹었을 때?",
-      optionA: "팀원들과 공유하여 전체적인 이득을 추구",
-      optionB: "혼자서 더 많은 파밍과 압박을 시도",
-      axis: ['T', 'M']
-    },
-    {
-      question: "제어와드를 놓을 때?",
-      optionA: "팀의 안전을 위해 전략적 위치에 배치",
-      optionB: "개인적인 안전을 위해 내 주변에 집중",
+      question: "용 or 바론 한타 콜이 오면?",
+      optionA: "무조건 달려간다",
+      optionB: "라인 클리어부터 한다",
       axis: ['E', 'I']
     },
     {
-      question: "용이나 바론 한타에서 중요한 것은?",
-      optionA: "팀원들과의 협력과 포지셔닝",
-      optionB: "개인의 딜링과 생존",
-      axis: ['G', 'C']
+      question: "한타 중, 적 딜러가 눈앞에 있다면?",
+      optionA: "즉시 진입",
+      optionB: "포지션 유지",
+      axis: ['E', 'I']
     },
     {
-      question: "한타에서 딜러 역할을 맡았을 때?",
-      optionA: "안전한 위치에서 지속적인 딜링",
-      optionB: "리스크를 감수하고 적극적인 플레이",
-      axis: ['P', 'S']
-    },
-    {
-      question: "0/3/0 상황에서 중요한 것은?",
-      optionA: "체계적인 운영과 팀워크로 역전",
-      optionB: "감정적이 되지 않고 침착하게 대응",
+      question: "내가 0/3/0 이 되었을 때?",
+      optionA: "침착하고 안정적으로 플레이",
+      optionB: "역전을 노린다, 과감한 플레이",
       axis: ['T', 'M']
     },
     {
-      question: "연패를 하고 있을 때?",
-      optionA: "전략을 바꾸고 새로운 방법을 시도",
-      optionB: "기본기에 충실하고 안정적인 플레이",
-      axis: ['E', 'I']
+      question: "연패 중일 때 나는?",
+      optionA: "큐 돌려!",
+      optionB: "쉬었다 한다",
+      axis: ['T', 'M']
     }
   ]
 
