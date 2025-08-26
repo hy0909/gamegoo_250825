@@ -408,7 +408,10 @@ function App() {
     if (newAnswers.length === rollBtiQuestions.length) {
       // 모든 질문에 답변 완료
       const resultType = calculateResultType(newAnswers);
-      const result = rollBtiResults[resultType];
+      const resultData = rollBtiResults[resultType];
+      
+      // 결과 상태 설정
+      setResult(resultData);
       
       // 로컬로만 처리 (Supabase 연결 없음)
       try {
