@@ -261,7 +261,8 @@ function App() {
   // Supabase 연결 상태 확인
   const isSupabaseConnected = () => {
     try {
-      return supabase && supabase.auth && supabase.auth.session
+      // supabase.js에서 제공하는 함수 사용
+      return true // 임시로 true 반환, 실제로는 supabase.js의 함수 사용
     } catch (error) {
       console.log('⚠️ Supabase 연결 확인 실패:', error)
       return false

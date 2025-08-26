@@ -77,9 +77,9 @@ export async function saveUserAnswers(sessionId, answers) {
 
     console.log('🔍 답변 저장 시도:', { sessionId, answers })
 
-    // rollbti_stats 테이블에 답변 저장
+    // rollbti_simple 테이블에 답변 저장
     const { data, error } = await supabase
-      .from('rollbti_stats')
+      .from('rollbti_simple')
       .insert([
         {
           session_id: sessionId,
@@ -114,9 +114,9 @@ export async function saveUserResult(sessionId, resultType, resultTitle, axisSco
 
     console.log('🔍 결과 저장 시도:', { sessionId, resultType, resultTitle, axisScores })
 
-    // rollbti_stats 테이블에 결과 저장
+    // rollbti_simple 테이블에 결과 저장
     const { data, error } = await supabase
-      .from('rollbti_stats')
+      .from('rollbti_simple')
       .insert([
         {
           session_id: sessionId,
@@ -155,9 +155,9 @@ export async function completeUserSession(sessionId) {
 
     console.log('🔍 세션 완료 처리 시도:', sessionId)
 
-    // rollbti_stats 테이블에 완료 기록
+    // rollbti_simple 테이블에 완료 기록
     const { data, error } = await supabase
-      .from('rollbti_stats')
+      .from('rollbti_simple')
       .insert([
         {
           session_id: sessionId,
@@ -196,13 +196,55 @@ export async function incrementParticipantCount() {
 
     console.log('🔍 참여자 수 증가 시도 (Supabase)')
 
-    // rollbti_stats 테이블의 participant_count 증가
-    const { data, error } = await supabase
-      .rpc('increment_participant_count')
+    // rollbti_simple 테이블에서 participant_count 증가
+    // 먼저 현재 값을 조회
+    const { data: currentData, error: selectError } = await supabase
+      .from('rollbti_simple')
+      .select('participant_count')
+      .eq('id', 1)
+      .single()
 
-    if (error) {
-      console.warn('⚠️ 참여자 수 증가 실패:', error.message)
-      console.log('🔍 에러 상세:', error)
+    if (selectError) {
+      console.warn('⚠️ 현재 참여자 수 조회 실패:', selectError.message)
+      // 새로운 레코드 생성
+      const { data: insertData, error: insertError } = await supabase
+        .from('rollbti_simple')
+        .insert([
+          {
+            id: 1,
+            participant_count: 1,
+            data_type: 'stats',
+            created_at: new Date().toISOString()
+          }
+        ])
+        .select()
+
+      if (insertError) {
+        console.warn('⚠️ 참여자 수 초기화 실패:', insertError.message)
+        // 로컬 폴백
+        const currentCount = parseInt(localStorage.getItem('participantCount') || '0', 10);
+        const newCount = currentCount + 1;
+        localStorage.setItem('participantCount', newCount.toString());
+        return newCount;
+      }
+
+      console.log('✅ 참여자 수 초기화 성공:', insertData)
+      return 1
+    }
+
+    // 기존 값 증가
+    const currentCount = currentData.participant_count || 0
+    const newCount = currentCount + 1
+
+    const { data: updateData, error: updateError } = await supabase
+      .from('rollbti_simple')
+      .update({ participant_count: newCount })
+      .eq('id', 1)
+      .select()
+
+    if (updateError) {
+      console.warn('⚠️ 참여자 수 증가 실패:', updateError.message)
+      console.log('🔍 에러 상세:', updateError)
       // 로컬 폴백
       const currentCount = parseInt(localStorage.getItem('participantCount') || '0', 10);
       const newCount = currentCount + 1;
@@ -210,8 +252,8 @@ export async function incrementParticipantCount() {
       return newCount;
     }
 
-    console.log('✅ 참여자 수 증가 성공:', data)
-    return data
+    console.log('✅ 참여자 수 증가 성공:', updateData)
+    return newCount
   } catch (error) {
     console.warn('⚠️ 참여자 수 증가 실패:', error.message)
     // 로컬 폴백
@@ -233,9 +275,9 @@ export async function getParticipantCount() {
 
     console.log('🔍 참여자 수 조회 시도 (Supabase)')
 
-    // rollbti_stats 테이블에서 참여자 수 조회
+    // rollbti_simple 테이블에서 참여자 수 조회
     const { data, error } = await supabase
-      .from('rollbti_stats')
+      .from('rollbti_simple')
       .select('participant_count')
       .eq('id', 1)
       .single()
@@ -268,9 +310,9 @@ export async function trackUserAction(sessionId, actionType, actionData = {}) {
 
     console.log('🔍 행동 추적 시도:', { sessionId, actionType, actionData })
 
-    // rollbti_stats 테이블에 행동 기록
+    // rollbti_simple 테이블에 행동 기록
     const { data, error } = await supabase
-      .from('rollbti_stats')
+      .from('rollbti_simple')
       .insert([
         {
           session_id: sessionId,
