@@ -1,254 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import BarChart from './BarChart'
-import { supabase, generateSessionId, getUtmParams, isSupabaseConnected, getParticipantCount, incrementParticipantCount } from './supabase'
-
-// 롤BTI 질문 데이터 (9가지 질문)
-const rollBtiQuestions = [
-  { 
-    id: 1, 
-    question: "블리츠크랭크가 인베 가자고 하면?", 
-    optionA: "무조건 따라감", 
-    optionB: "가볍게 무시", 
-    axis: ['E', 'I'] 
-  },
-  { 
-    id: 2, 
-    question: "게임 초반 운영은?", 
-    optionA: "초반 압박으로 굴린다", 
-    optionB: "안전하게 성장", 
-    axis: ['S', 'P'] 
-  },
-  { 
-    id: 3, 
-    question: "초반 킬각이 보이면?", 
-    optionA: "무조건 싸운다", 
-    optionB: "안정적으로 간다", 
-    axis: ['S', 'P'] 
-  },
-  { 
-    id: 4, 
-    question: "블루 버프를 먹고 싶은 다른 팀원이 있다면?", 
-    optionA: "이미 내가 먹었다", 
-    optionB: "양보한다", 
-    axis: ['G', 'C'] 
-  },
-  { 
-    id: 5, 
-    question: "제어와드 막타는?", 
-    optionA: "팀원에게 양보한다", 
-    optionB: "내가 먹는다", 
-    axis: ['C', 'G'] 
-  },
-  { 
-    id: 6, 
-    question: "용 or 바론 한타 콜이 오면?", 
-    optionA: "무조건 달려간다", 
-    optionB: "라인 클리어부터 한다", 
-    axis: ['E', 'I'] 
-  },
-  { 
-    id: 7, 
-    question: "한타 중, 적 딜러가 눈앞에 있다면?", 
-    optionA: "즉시 진입", 
-    optionB: "포지션 유지", 
-    axis: ['E', 'I'] 
-  },
-  { 
-    id: 8, 
-    question: "내가 0/3/0 이 되었을 때?", 
-    optionA: "침착하고 안정적으로 플레이", 
-    optionB: "역전을 노린다, 과감한 플레이", 
-    axis: ['T', 'M'] 
-  },
-  { 
-    id: 9, 
-    question: "연패 중일 때 나는?", 
-    optionA: "큐 돌려!", 
-    optionB: "쉬었다 한다", 
-    axis: ['T', 'M'] 
-  }
-]
-
-// 롤BTI 결과 데이터 (16가지 유형)
-const rollBtiResults = {
-  'EGPT': { 
-    type: 'EGPT', 
-    title: '용감한 팀파이터', 
-    description: '한타는 내 전부, 맵 끝에서라도 달려감. 멘탈이 강철이라 역전 각 보는 타입',
-    strengths: '팀 결속력, 오브젝트 싸움 주도',
-    weaknesses: '과도한 진입, 파밍 부족',
-    champions: '아무무, 오공, 자르반 4세',
-    goodWith: 'ICPT, ECST',
-    avoidWith: 'IGPM',
-    quote: '"한타는 내 삶의 이유다."'
-  },
-  'EGPM': { 
-    type: 'EGPM', 
-    title: '열혈 돌격수', 
-    description: '한타 최전선, 그러나 기분에 따라 판단 바뀜. 잘 풀리면 미친 듯이 몰아치지만, 삐지면 존재감↓',
-    strengths: '폭발적 파괴력',
-    weaknesses: '멘탈 흔들리면 손해 큼',
-    champions: '다리우스, 가렌',
-    goodWith: 'ECPT, ICST',
-    avoidWith: 'IGSM',
-    quote: '"분노가 내 무기다."'
-  },
-  'EGST': { 
-    type: 'EGST', 
-    title: '초반 강탈자', 
-    description: '초반 교전·갱킹에 모든 힘 쏟음. 이득 보면 그대로 스노우볼 굴림',
-    strengths: '경기 템포 장악',
-    weaknesses: '초반 실패 시 팀 부담↑',
-    champions: '리 신, 판테온',
-    goodWith: 'ICST, ECST',
-    avoidWith: 'ICPT',
-    quote: '"첫 10분이 내 전부다."'
-  },
-  'EGSM': { 
-    type: 'EGSM', 
-    title: '돌격 불도저', 
-    description: '초반 킬 먹으면 기분 최고, 아니면 급다운. 감정 따라 플레이 기복 심함',
-    strengths: '잘 풀릴 땐 무적',
-    weaknesses: '흐름 끊기면 공백기',
-    champions: '제드, 카타리나',
-    goodWith: 'ECST',
-    avoidWith: 'ICPT',
-    quote: '"킬 먹었으니 내가 주인공이다."'
-  },
-  'ECPT': { 
-    type: 'ECPT', 
-    title: '헌신적 지휘관', 
-    description: '자원 양보, 안정 운영, 팀 중심. 게임을 설계하는 브레인',
-    strengths: '안정성과 팀워크',
-    weaknesses: '개인 캐리력↓',
-    champions: '브라움, 세나',
-    goodWith: 'EGPT, EGST',
-    avoidWith: 'IGPM',
-    quote: '"내 팀이 곧 나다."'
-  },
-  'ECPM': { 
-    type: 'ECPM', 
-    title: '따뜻한 전투 요정', 
-    description: '팀 살리기에 전념하지만, 가끔 섭섭해함. 케어에 자부심 강함',
-    strengths: '아군 생존율↑',
-    weaknesses: '멘탈 흔들리면 소극적',
-    champions: '소라카, 유미',
-    goodWith: 'EGPT, ICST',
-    avoidWith: 'IGSM',
-    quote: '"너를 살리는 게 내 사명."'
-  },
-  'ECST': { 
-    type: 'ECST', 
-    title: '오브젝트 마스터', 
-    description: '초반 주도권 잡아 용·전령 다 챙김. 운영 중심형 한타 플레이어',
-    strengths: '오브젝트 장악, 팀 이득 극대화',
-    weaknesses: '지나친 운영 집중으로 전투 감각 저하',
-    champions: '자르반 4세, 탈리야',
-    goodWith: 'EGPT, ICPT',
-    avoidWith: 'IGPM',
-    quote: '"지도 위의 모든 점을 내 색으로."'
-  },
-  'ECSM': { 
-    type: 'ECSM', 
-    title: '전장의 힐러', 
-    description: '초반 이득 후 팀원 살리기 집중. 기분 좋으면 날아다니지만, 안 풀리면 조용해짐',
-    strengths: '팀 유지력 극대화',
-    weaknesses: '초반 실패 시 영향력↓',
-    champions: '잔나, 룰루',
-    goodWith: 'EGST, ICPT',
-    avoidWith: 'IGSM',
-    quote: '"내 버프를 받은 자, 무적이리라."'
-  },
-  'IGPT': { 
-    type: 'IGPT', 
-    title: '솔라인 수호자', 
-    description: '내 라인 성장에 집중, 그러나 멘탈 단단. 후반 캐리각 노림',
-    strengths: '안정적 성장, 후반 영향력',
-    weaknesses: '초반 한타 영향력↓',
-    champions: '나서스, 초가스, 탑스몰더',
-    goodWith: 'ECST, EGPT',
-    avoidWith: 'EGST',
-    quote: '"시간은 내 편이다."'
-  },
-  'IGPM': { 
-    type: 'IGPM', 
-    title: '외로운 캐리형', 
-    description: '라인전 고립 플레이, 기분에 따라 영향력 요동. 팀플보다 개인 캐리 선호',
-    strengths: '잘 풀리면 혼자 승리',
-    weaknesses: '안 풀리면 팀 연계 단절',
-    champions: '야스오, 이렐리아',
-    goodWith: 'ECSM',
-    avoidWith: 'EGPT',
-    quote: '"내가 캐리하면 다 끝."'
-  },
-  'IGST': { 
-    type: 'IGST', 
-    title: '고독한 킬머신', 
-    description: '혼자 놀다 타이밍 맞춰 치명적 진입. 초반 킬로 성장 터뜨림',
-    strengths: '암살 능력',
-    weaknesses: '팀 연계 부족',
-    champions: '카직스, 피즈',
-    goodWith: 'ECSM',
-    avoidWith: 'ECPT',
-    quote: '"그늘에서 꽃을 피운다."'
-  },
-  'IGSM': { 
-    type: 'IGSM', 
-    title: '터렛 다이버', 
-    description: '라인전에서 과감한 다이브, 초반 폭발력. 멘탈 흔들리면 존재감 급감',
-    strengths: '라인전 강함',
-    weaknesses: '실패 시 스노우볼 역전당함',
-    champions: '카밀, 레넥톤, 나서스, 요릭',
-    goodWith: 'ECST',
-    avoidWith: 'ECPT',
-    quote: '"롤은 넥서스뿌수는 게임이다"'
-  },
-  'ICPT': { 
-    type: 'ICPT', 
-    title: '방패형 운영러', 
-    description: '자원 양보, 안정적 운영. 팀을 지키는 든든한 존재',
-    strengths: '방어적 운영, 후반 안정성',
-    weaknesses: '캐리력 부족',
-    champions: '말파이트, 마오카이',
-    goodWith: 'EGPT',
-    avoidWith: 'IGSM',
-    quote: '"나는 벽이다."'
-  },
-  'ICPM': { 
-    type: 'ICPM', 
-    title: '가끔 삐지는 브루저', 
-    description: '헌신하지만 가끔 감정 기복. 팀을 위해 몸 던지지만 불만 쌓임',
-    strengths: '팀 기여도 높음',
-    weaknesses: '멘탈 나가면 소극적',
-    champions: '다리우스, 나르',
-    goodWith: 'EGPT, ECST',
-    avoidWith: 'IGSM',
-    quote: '"오늘은 참는다."'
-  },
-  'ICST': { 
-    type: 'ICST', 
-    title: '전략 설계자', 
-    description: '자원 양보, 운영·전략 설계에 능함. 미드, 전략적인 챔피언 선호',
-    strengths: '안정적 초반 운영',
-    weaknesses: '직접 킬 결정력↓',
-    champions: '트위스티드 페이트, 리산드라, 조이, 아리',
-    goodWith: 'EGST, EGPT',
-    avoidWith: 'IGPM',
-    quote: '"전쟁은 머리로 하는 것."'
-  },
-  'ICSM': { 
-    type: 'ICSM', 
-    title: '기분파 지원형', 
-    description: '초반 이득 후 지원 집중, 기분 따라 영향력 달라짐',
-    strengths: '팀 유연성',
-    weaknesses: '멘탈 기복',
-    champions: '룰루, 카르마',
-    goodWith: 'EGST, ECST',
-    avoidWith: 'IGSM',
-    quote: '"기분 좋으면 날개 달린다."'
-  }
-}
+import { 
+  isSupabaseConnected, 
+  getParticipantCount, 
+  incrementParticipantCount,
+  createUserSession,
+  saveUserAnswers,
+  saveUserResult,
+  trackUserAction,
+  completeUserSession
+} from './supabase'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('main')
@@ -256,285 +18,483 @@ function App() {
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [shareMessage, setShareMessage] = useState('')
-  
-  // localStorage에서 참여자 수 초기값 가져오기 (새로고침 시 초기화 방지)
-  const getInitialParticipantCount = () => {
-    const savedCount = localStorage.getItem('gamegoo_participant_count')
-    if (savedCount && parseInt(savedCount) > 0) {
-      console.log('🔄 localStorage에서 초기값 가져옴:', savedCount)
-      return parseInt(savedCount)
+  const [participantCount, setParticipantCount] = useState(4)
+  const [sessionId, setSessionId] = useState(null)
+
+  // 롤BTI 질문 데이터
+  const rollBtiQuestions = [
+    {
+      question: "블리츠크랭크가 인베 가자고 하면?",
+      optionA: "무조건 따라감",
+      optionB: "가볍게 무시",
+      axis: ['E', 'I']
+    },
+    {
+      question: "초반 운영에서 중요한 것은?",
+      optionA: "안전한 파밍과 시야 확보",
+      optionB: "적극적인 로밍과 갱킹",
+      axis: ['G', 'C']
+    },
+    {
+      question: "초반에 킬각이 보이면?",
+      optionA: "신중하게 판단하고 기회만 노림",
+      optionB: "즉시 달려가서 싸움을 시작",
+      axis: ['P', 'S']
+    },
+    {
+      question: "블루 버프를 먹었을 때?",
+      optionA: "팀원들과 공유하여 전체적인 이득을 추구",
+      optionB: "혼자서 더 많은 파밍과 압박을 시도",
+      axis: ['T', 'M']
+    },
+    {
+      question: "제어와드를 놓을 때?",
+      optionA: "팀의 안전을 위해 전략적 위치에 배치",
+      optionB: "개인적인 안전을 위해 내 주변에 집중",
+      axis: ['E', 'I']
+    },
+    {
+      question: "용이나 바론 한타에서 중요한 것은?",
+      optionA: "팀원들과의 협력과 포지셔닝",
+      optionB: "개인의 딜링과 생존",
+      axis: ['G', 'C']
+    },
+    {
+      question: "한타에서 딜러 역할을 맡았을 때?",
+      optionA: "안전한 위치에서 지속적인 딜링",
+      optionB: "리스크를 감수하고 적극적인 플레이",
+      axis: ['P', 'S']
+    },
+    {
+      question: "0/3/0 상황에서 중요한 것은?",
+      optionA: "체계적인 운영과 팀워크로 역전",
+      optionB: "감정적이 되지 않고 침착하게 대응",
+      axis: ['T', 'M']
+    },
+    {
+      question: "연패를 하고 있을 때?",
+      optionA: "전략을 바꾸고 새로운 방법을 시도",
+      optionB: "기본기에 충실하고 안정적인 플레이",
+      axis: ['E', 'I']
     }
-    return 0 // localStorage에 없으면 0으로 시작
-  }
-  
-  const [participantCount, setParticipantCount] = useState(getInitialParticipantCount())
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastSyncTime, setLastSyncTime] = useState(null)
+  ]
 
-  // 세션 ID 생성
-  const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-  
-  // UTM 파라미터 추출
-  const urlParams = new URLSearchParams(window.location.search)
-  const utmParams = {
-    utm_source: urlParams.get('utm_source'),
-    utm_medium: urlParams.get('utm_medium'),
-    utm_campaign: urlParams.get('utm_campaign')
+  // 롤BTI 결과 데이터 (16가지 유형)
+  const rollBtiResults = {
+    'EGPT': {
+      type: 'EGPT',
+      title: '용감한 팀파이터',
+      description: '팀을 위해 적극적으로 싸우며, 안정적인 운영을 선호하는 전략적 플레이어입니다.',
+      champions: '리신, 판테온',
+      strengths: '팀워크가 뛰어나고 전략적 사고가 명확합니다.',
+      weaknesses: '때로는 너무 보수적일 수 있습니다.',
+      goodWith: 'ICST, EGPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '한타는 내 삶의 이유다.'
+    },
+    'EGST': {
+      type: 'EGST',
+      title: '열정적인 공격수',
+      description: '팀을 위해 적극적으로 싸우며, 공격적인 운영을 선호하는 열정적인 플레이어입니다.',
+      champions: '야스오, 카타리나',
+      strengths: '공격성이 뛰어나고 팀워크가 좋습니다.',
+      weaknesses: '때로는 너무 공격적일 수 있습니다.',
+      goodWith: 'ICST, EGPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGPT, ICST 유형과는 주의가 필요합니다.',
+      quote: '공격이 최고의 방어다.'
+    },
+    'ECPT': {
+      type: 'ECPT',
+      title: '신중한 팀플레이어',
+      description: '팀을 위해 적극적으로 싸우며, 안정적인 운영을 선호하는 신중한 플레이어입니다.',
+      champions: '오리아나, 빅토르',
+      strengths: '팀워크가 뛰어나고 안정적입니다.',
+      weaknesses: '때로는 너무 신중할 수 있습니다.',
+      goodWith: 'ICST, EGPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '팀워크가 승리의 열쇠다.'
+    },
+    'ECST': {
+      type: 'ECST',
+      title: '열정적인 팀워커',
+      description: '팀을 위해 적극적으로 싸우며, 공격적인 운영을 선호하는 열정적인 팀워커입니다.',
+      champions: '레나타 글라스크, 나미',
+      strengths: '팀워크가 뛰어나고 열정적입니다.',
+      weaknesses: '때로는 너무 열정적일 수 있습니다.',
+      goodWith: 'ICST, EGPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGPT, IGPT 유형과는 주의가 필요합니다.',
+      quote: '팀을 위한 희생이 최고의 미덕이다.'
+    },
+    'ICPT': {
+      type: 'ICPT',
+      title: '전략적 개인플레이어',
+      description: '개인적인 플레이를 선호하며, 안정적인 운영을 추구하는 전략적 플레이어입니다.',
+      champions: '베인, 케이틀린',
+      strengths: '전략적 사고가 뛰어나고 안정적입니다.',
+      weaknesses: '팀워크가 부족할 수 있습니다.',
+      goodWith: 'EGPT, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '전략이 승리를 만든다.'
+    },
+    'ICST': {
+      type: 'ICST',
+      title: '공격적인 개인플레이어',
+      description: '개인적인 플레이를 선호하며, 공격적인 운영을 추구하는 공격적인 플레이어입니다.',
+      champions: '제리, 트리스타나',
+      strengths: '공격성이 뛰어나고 개인 플레이가 좋습니다.',
+      weaknesses: '팀워크가 부족할 수 있습니다.',
+      goodWith: 'EGPT, ICPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '개인의 실력이 승리를 결정한다.'
+    },
+    'IGPT': {
+      type: 'IGPT',
+      title: '안정적인 운영자',
+      description: '안정적인 운영을 선호하며, 팀워크를 중시하는 안정적인 운영자입니다.',
+      champions: '말자하, 아지르',
+      strengths: '안정적이고 팀워크가 좋습니다.',
+      weaknesses: '공격성이 부족할 수 있습니다.',
+      goodWith: 'EGPT, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '안정적인 운영이 승리의 기반이다.'
+    },
+    'IGST': {
+      type: 'IGST',
+      title: '공격적인 운영자',
+      description: '안정적인 운영을 선호하며, 공격적인 플레이를 추구하는 공격적인 운영자입니다.',
+      champions: '카사딘, 카시오페아',
+      strengths: '공격적이고 안정적입니다.',
+      weaknesses: '팀워크가 부족할 수 있습니다.',
+      goodWith: 'EGPT, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGST, IGPT 유형과는 주의가 필요합니다.',
+      quote: '공격적인 운영이 승리를 만든다.'
+    },
+    'EGPM': {
+      type: 'EGPM',
+      title: '열혈 돌격수',
+      description: '한타 최전선에서 적극적으로 싸우지만, 기분에 따라 판단이 바뀌는 플레이어입니다.',
+      champions: '다리우스, 가렌',
+      strengths: '폭발적 파괴력과 열정적인 플레이',
+      weaknesses: '멘탈이 흔들리면 손해가 큽니다.',
+      goodWith: 'ECPT, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'IGSM, ICPT 유형과는 주의가 필요합니다.',
+      quote: '분노가 내 무기다.'
+    },
+    'EGSM': {
+      type: 'EGSM',
+      title: '돌격 불도저',
+      description: '초반 킬을 먹으면 기분이 최고가 되고, 아니면 급격히 다운되는 플레이어입니다.',
+      champions: '제드, 카타리나',
+      strengths: '잘 풀릴 때는 무적',
+      weaknesses: '흐름이 끊기면 공백기가 길어집니다.',
+      goodWith: 'ECST, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'ICPT, IGPT 유형과는 주의가 필요합니다.',
+      quote: '킬 먹었으니 내가 주인공이다.'
+    },
+    'ECPM': {
+      type: 'ECPM',
+      title: '따뜻한 전투 요정',
+      description: '팀 살리기에 전념하지만, 가끔 섭섭해하는 플레이어입니다.',
+      champions: '소라카, 유미',
+      strengths: '아군 생존율을 크게 높입니다.',
+      weaknesses: '멘탈이 흔들리면 소극적이 됩니다.',
+      goodWith: 'EGPT, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'IGSM, IGPT 유형과는 주의가 필요합니다.',
+      quote: '너를 살리는 게 내 사명.'
+    },
+    'ECSM': {
+      type: 'ECSM',
+      title: '전장의 힐러',
+      description: '초반 이득 후 팀원 살리기에 집중하는 플레이어입니다.',
+      champions: '잔나, 룰루',
+      strengths: '팀 유지력을 극대화합니다.',
+      weaknesses: '초반 실패 시 영향력이 떨어집니다.',
+      goodWith: 'EGST, ICPT 유형과 궁합이 좋습니다.',
+      avoidWith: 'IGSM, IGPT 유형과는 주의가 필요합니다.',
+      quote: '내 버프를 받은 자, 무적이리라.'
+    },
+    'IGPM': {
+      type: 'IGPM',
+      title: '외로운 캐리형',
+      description: '라인전에서 고립된 플레이를 선호하며, 개인 캐리에 집중하는 플레이어입니다.',
+      champions: '야스오, 이렐리아',
+      strengths: '잘 풀리면 혼자서 승리를 만듭니다.',
+      weaknesses: '안 풀리면 팀 연계가 단절됩니다.',
+      goodWith: 'ECSM, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'EGPT, EGPT 유형과는 주의가 필요합니다.',
+      quote: '내가 캐리하면 다 끝.'
+    },
+    'IGSM': {
+      type: 'IGSM',
+      title: '터렛 다이버',
+      description: '라인전에서 과감한 다이브를 시도하며, 초반 폭발력을 추구하는 플레이어입니다.',
+      champions: '카밀, 레넥톤',
+      strengths: '라인전에서 매우 강합니다.',
+      weaknesses: '실패 시 스노우볼을 역전당할 수 있습니다.',
+      goodWith: 'ECST, ICST 유형과 궁합이 좋습니다.',
+      avoidWith: 'ECPT, IGPT 유형과는 주의가 필요합니다.',
+      quote: '롤은 넥서스뿌수는 게임이다.'
+    },
+    'ICPM': {
+      type: 'ICPM',
+      title: '가끔 삐지는 브루저',
+      description: '헌신적으로 플레이하지만 가끔 감정 기복이 있는 플레이어입니다.',
+      champions: '다리우스, 나르',
+      strengths: '팀 기여도가 높습니다.',
+      weaknesses: '멘탈이 나가면 소극적이 됩니다.',
+      goodWith: 'EGPT, ECST 유형과 궁합이 좋습니다.',
+      avoidWith: 'IGSM, IGPT 유형과는 주의가 필요합니다.',
+      quote: '오늘은 참는다.'
+    },
+    'ICSM': {
+      type: 'ICSM',
+      title: '기분파 지원형',
+      description: '초반 이득 후 지원에 집중하며, 기분에 따라 영향력이 달라지는 플레이어입니다.',
+      champions: '룰루, 카르마',
+      strengths: '팀 유연성이 뛰어납니다.',
+      weaknesses: '멘탈 기복이 심합니다.',
+      goodWith: 'EGST, ECST 유형과 궁합이 좋습니다.',
+      avoidWith: 'IGSM, IGPT 유형과는 주의가 필요합니다.',
+      quote: '기분 좋으면 날개 달린다.'
+    }
   }
 
-  // Supabase에서 직접 참여자 수 가져오기 (새로고침 시 초기화 방지)
-  const loadParticipantCountFromSupabase = useCallback(async () => {
+  // Supabase 연결 상태 확인
+  const isSupabaseConnected = () => {
     try {
-      console.log('🚀 Supabase에서 참여자 수 직접 가져오기 시작...')
-      setIsLoading(true)
-      
-      // 무조건 Supabase에서 최신 수 가져오기
-      const supabaseCount = await getParticipantCount()
-      console.log('✅ Supabase에서 가져온 참여자 수:', supabaseCount)
-      
-      if (supabaseCount > 0) {
-        // Supabase 수가 현재보다 크거나 같으면 업데이트 (절대 줄어들지 않음)
-        setParticipantCount(prevCount => {
-          if (supabaseCount >= prevCount) {
-            console.log('✅ 참여자 수 업데이트:', prevCount, '→', supabaseCount)
-            localStorage.setItem('gamegoo_participant_count', supabaseCount.toString())
-            setLastSyncTime(new Date().toLocaleTimeString())
-            return supabaseCount
-          } else {
-            // Supabase 수가 작으면 현재 수 유지 (절대 초기화 안함)
-            console.log('🛡️ 참여자 수 보호: Supabase 수가 작음, 현재 수 유지:', prevCount)
-            setLastSyncTime(new Date().toLocaleTimeString())
-            return prevCount
-          }
-        })
-      } else {
-        // Supabase에 데이터가 없으면 현재 수 유지 (절대 초기화 안함)
-        console.log('🛡️ 참여자 수 보호: Supabase에 데이터 없음, 현재 수 유지')
-        setLastSyncTime(new Date().toLocaleTimeString())
-      }
-      
+      return supabase && supabase.auth && supabase.auth.session
     } catch (error) {
-      console.error('❌ Supabase에서 참여자 수 가져오기 실패:', error)
-      // 에러 시에도 현재 수 유지 (절대 초기화 안함)
-      console.log('🛡️ 에러 발생 시에도 참여자 수 보호')
-    } finally {
-      setIsLoading(false)
+      console.log('⚠️ Supabase 연결 확인 실패:', error)
+      return false
     }
+  }
+
+  // 세션 초기화 (Supabase 연결 실패 시에도 작동)
+  const initSession = async () => {
+    try {
+      if (isSupabaseConnected()) {
+        const newSessionId = await createUserSession()
+        if (newSessionId) {
+          setSessionId(newSessionId)
+          console.log('✅ Supabase 세션 생성:', newSessionId)
+        }
+      } else {
+        console.log('⚠️ Supabase 연결 없음 - 로컬 세션 사용')
+        // 로컬 세션 ID 생성 (Supabase 연결 실패 시)
+        const localSessionId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        setSessionId(localSessionId)
+        console.log('✅ 로컬 세션 생성:', localSessionId)
+      }
+    } catch (error) {
+      console.log('⚠️ 세션 생성 실패 - 로컬 세션 사용:', error)
+      // 로컬 세션 ID 생성 (에러 발생 시)
+      const localSessionId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      setSessionId(localSessionId)
+      console.log('✅ 로컬 세션 생성:', localSessionId)
+    }
+  }
+
+  // 초기 참여자 수 로드
+  useEffect(() => {
+    const loadParticipantCount = async () => {
+      try {
+        const count = await getParticipantCount()
+        setParticipantCount(count)
+        localStorage.setItem('participantCount', count.toString())
+      } catch (error) {
+        console.error('참여자 수 로드 실패:', error)
+        const localCount = localStorage.getItem('participantCount')
+        if (localCount) {
+          setParticipantCount(parseInt(localCount))
+        }
+      }
+    }
+
+    loadParticipantCount()
   }, [])
 
-  // 앱 초기화
+  // URL 파라미터 처리 (결과 공유 링크)
   useEffect(() => {
-    console.log('=== 앱 초기화 시작 ===')
-    console.log('초기 참여자 수:', participantCount)
-    
-    // URL에 result 파라미터가 있으면 결과 페이지로
+    const urlParams = new URLSearchParams(window.location.search)
     const resultParam = urlParams.get('result')
+    
     if (resultParam && rollBtiResults[resultParam]) {
       setResult(rollBtiResults[resultParam])
       setCurrentPage('result')
-      
-      // URL 파라미터로 접근한 경우 기본 answers 배열 생성 (디버깅용)
-      const defaultAnswers = ['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A']
-      setAnswers(defaultAnswers)
-      
-      logPageVisit('result', resultParam)
-    } else {
-      // 메인 페이지 방문 로그
-      logPageVisit('main')
-      // 참여자 수 즉시 Supabase에서 가져오기 (0.05초 후)
-      setTimeout(() => {
-        loadParticipantCountFromSupabase()
-      }, 50) // 0.1초 → 0.05초로 단축
+      // 디버깅을 위한 기본 답변 설정
+      setAnswers(['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'])
     }
-  }, [loadParticipantCountFromSupabase])
+  }, [])
 
-  // 참여자 수 실시간 폴링 (0.5초마다 - 새로고침 후 빠른 동기화)
+  // 사용자 세션 생성
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadParticipantCountFromSupabase()
-    }, 500) // 1초마다
-    
-    return () => clearInterval(interval)
-  }, [loadParticipantCountFromSupabase])
+    initSession()
+  }, [])
 
-  // 강제 동기화 함수 (Supabase에서 직접 가져오기)
-  const forceSync = async () => {
-    console.log('🚀 강제 동기화 시작...')
-    await loadParticipantCountFromSupabase()
-  }
+  // 결과 유형 계산
+  const calculateResultType = (answers) => {
+    if (answers.length !== 9) return 'EGPT'
 
-  // 페이지 방문 로그
-  const logPageVisit = (page, resultType = null) => {
-    try {
-      if (isSupabaseConnected()) {
-        const logData = {
-          session_id: sessionId,
-          page: page,
-          result_type: resultType,
-          utm_source: utmParams.utm_source,
-          utm_medium: utmParams.utm_medium,
-          utm_campaign: utmParams.utm_campaign,
-          timestamp: new Date().toISOString()
-        }
-        
-        // Supabase에 로그 저장
-        supabase.from('page_visits').insert([logData])
-          .then(() => console.log('✅ 페이지 방문 로그 저장됨:', page))
-          .catch(error => console.error('❌ 페이지 방문 로그 저장 실패:', error))
+    // 각 축별로 A/B 답변 수 계산
+    const axisCounts = {
+      'E/I': { E: 0, I: 0 },
+      'G/C': { G: 0, C: 0 },
+      'P/S': { P: 0, S: 0 },
+      'T/M': { T: 0, M: 0 }
+    }
+
+    // 질문별 축 매핑
+    const questionAxisMapping = {
+      0: 'E/I', 1: 'G/C', 2: 'P/S', 3: 'T/M', 4: 'E/I',
+      5: 'G/C', 6: 'P/S', 7: 'T/M', 8: 'E/I'
+    }
+
+    answers.forEach((answer, index) => {
+      const axis = questionAxisMapping[index]
+      if (answer === 'A') {
+        // A 답변은 첫 번째 성향
+        if (axis === 'E/I') axisCounts[axis].E++
+        else if (axis === 'G/C') axisCounts[axis].G++
+        else if (axis === 'P/S') axisCounts[axis].P++
+        else if (axis === 'T/M') axisCounts[axis].T++
+      } else {
+        // B 답변은 두 번째 성향
+        if (axis === 'E/I') axisCounts[axis].I++
+        else if (axis === 'G/C') axisCounts[axis].C++
+        else if (axis === 'P/S') axisCounts[axis].S++
+        else if (axis === 'T/M') axisCounts[axis].M++
       }
-    } catch (error) {
-      console.error('❌ 로그 저장 중 에러:', error)
-    }
+    })
+
+    // 결과 유형 결정
+    const resultType = [
+      axisCounts['E/I'].E > axisCounts['E/I'].I ? 'E' : 'I',
+      axisCounts['G/C'].G > axisCounts['G/C'].C ? 'G' : 'C',
+      axisCounts['P/S'].P > axisCounts['P/S'].S ? 'P' : 'S',
+      axisCounts['T/M'].T > axisCounts['T/M'].M ? 'T' : 'M'
+    ].join('')
+
+    return resultType
   }
 
-  // 테스트 재시작 로그
-  const logTestRestart = () => {
-    try {
-      if (isSupabaseConnected()) {
-        const logData = {
-          session_id: sessionId,
-          action: 'test_restart',
-          timestamp: new Date().toISOString()
-        }
-        
-        supabase.from('user_actions').insert([logData])
-          .then(() => console.log('✅ 테스트 재시작 로그 저장됨'))
-          .catch(error => console.error('❌ 테스트 재시작 로그 저장 실패:', error))
-      }
-    } catch (error) {
-      console.error('❌ 로그 저장 중 에러:', error)
-    }
-  }
-
-  // 테스트 결과 저장
-  const saveTestResult = (resultType, answers) => {
-    try {
-      if (isSupabaseConnected()) {
-        const resultData = {
-          session_id: sessionId,
-          result_type: resultType,
-          answers: answers.join(','),
-          utm_source: utmParams.utm_source,
-          utm_medium: utmParams.utm_medium,
-          utm_campaign: utmParams.utm_campaign,
-          timestamp: new Date().toISOString()
-        }
-        
-        supabase.from('user_test_results').insert([resultData])
-          .then(() => console.log('✅ 테스트 결과 저장됨:', resultType))
-          .catch(error => console.error('❌ 테스트 결과 저장 실패:', error))
-      }
-    } catch (error) {
-      console.error('❌ 결과 저장 중 에러:', error)
-    }
-  }
-
-  // 참여자 수 증가 함수 (Supabase에서 직접 가져오기)
-  const increaseParticipantCount = async () => {
-    try {
-      console.log('📈 참여자 수 증가 시작...')
-      
-      // 1. Supabase에 증가 요청
-      await incrementParticipantCount()
-      console.log('✅ Supabase 증가 완료')
-      
-      // 2. 즉시 Supabase에서 최신 수 가져오기
-      await loadParticipantCountFromSupabase()
-      console.log('✅ 참여자 수 증가 및 동기화 완료')
-      
-    } catch (error) {
-      console.error('❌ 참여자 수 증가 실패:', error)
-      // 에러 시에도 Supabase에서 다시 가져오기 시도
-      await loadParticipantCountFromSupabase()
-    }
-  }
-
-  // 테스트 재시작 (참여자 수는 절대 건드리지 않음)
-  const restartTest = () => {
-    console.log('🔄 테스트 재시작...')
-    console.log('현재 참여자 수 보존:', participantCount)
-    
-    // 테스트 상태만 리셋
-    setCurrentPage('main')
-    setCurrentQuestion(0)
-    setAnswers([])
-    setResult(null)
-    setShareMessage('')
-    
-    // URL 파라미터 클리어
-    window.history.pushState({}, '', window.location.pathname)
-    
-    // 로그
-    logTestRestart()
-    logPageVisit('main')
-    
-    console.log('✅ 테스트 재시자 완료, 참여자 수 보존:', participantCount)
-  }
-
-  // 답변 선택
-  const selectAnswer = (answer) => {
+  // 답변 선택 처리
+  const selectAnswer = async (answer) => {
     const newAnswers = [...answers, answer]
     setAnswers(newAnswers)
-    
-    if (newAnswers.length === rollBtiQuestions.length) {
-      // 모든 질문에 답변 완료
+
+    if (newAnswers.length === 9) {
+      // 모든 질문 답변 완료
       const resultType = calculateResultType(newAnswers)
-      setResult(rollBtiResults[resultType])
+      const resultData = rollBtiResults[resultType] || rollBtiResults['EGPT']
+      
+      setResult(resultData)
       setCurrentPage('result')
-      
-      // 결과 저장 및 로그
-      saveTestResult(resultType, newAnswers)
-      logPageVisit('result', resultType)
-      
-      // 참여자 수 증가
-      increaseParticipantCount()
-      
-      // URL에 결과 추가
-      const params = new URLSearchParams(window.location.search)
-      params.set('result', resultType)
-      window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+
+      // Supabase에 데이터 저장
+      if (sessionId && isSupabaseConnected()) {
+        try {
+          // 답변 저장
+          await saveUserAnswers(sessionId, newAnswers)
+          
+          // 축별 점수 계산
+          const axisScores = {
+            'E/I': { E: 0, I: 0, total: 0 },
+            'G/C': { G: 0, C: 0, total: 0 },
+            'P/S': { P: 0, S: 0, total: 0 },
+            'T/M': { T: 0, M: 0, total: 0 }
+          }
+
+          const questionAxisMapping = {
+            0: 'E/I', 1: 'G/C', 2: 'P/S', 3: 'T/M', 4: 'E/I',
+            5: 'G/C', 6: 'P/S', 7: 'T/M', 8: 'E/I'
+          }
+
+          newAnswers.forEach((answer, index) => {
+            const axis = questionAxisMapping[index]
+            if (answer === 'A') {
+              if (axis === 'E/I') axisScores[axis].E++
+              else if (axis === 'G/C') axisScores[axis].G++
+              else if (axis === 'P/S') axisScores[axis].P++
+              else if (axis === 'T/M') axisScores[axis].T++
+            } else {
+              if (axis === 'E/I') axisScores[axis].I++
+              else if (axis === 'G/C') axisScores[axis].C++
+              else if (axis === 'P/S') axisScores[axis].S++
+              else if (axis === 'T/M') axisScores[axis].M++
+            }
+            axisScores[axis].total++
+          })
+
+          // 결과 저장
+          await saveUserResult(sessionId, resultType, resultData.title, axisScores)
+          
+          // 세션 완료 처리
+          await completeUserSession(sessionId)
+          
+          // 참여자 수 증가
+          await incrementParticipantCount()
+          
+          console.log('✅ 테스트 완료 데이터 저장 완료')
+        } catch (error) {
+          console.error('❌ 데이터 저장 실패:', error)
+        }
+      }
+
+      // URL 업데이트
+      const newUrl = `${window.location.origin}${window.location.pathname}?result=${resultType}`
+      window.history.pushState({}, '', newUrl)
     } else {
       setCurrentQuestion(newAnswers.length)
     }
   }
 
-  // 결과 계산
-  const calculateResultType = (answers) => {
-    const axisCounts = {
-      'E': 0, 'I': 0,
-      'G': 0, 'C': 0,
-      'P': 0, 'S': 0,
-      'T': 0, 'M': 0
+  // 테스트 재시작
+  const restartTest = async () => {
+    // 행동 추적
+    if (sessionId && isSupabaseConnected()) {
+      await trackUserAction(sessionId, 'restart_clicked', { 
+        previous_result: result?.type,
+        restart_count: 1
+      })
     }
+
+    setCurrentPage('main') // 홈화면으로 이동
+    setCurrentQuestion(0)
+    setAnswers([])
+    setResult(null)
     
-    rollBtiQuestions.forEach((question, index) => {
-      if (answers[index] === 'A') {
-        axisCounts[question.axis[0]]++
-      } else if (answers[index] === 'B') {
-        axisCounts[question.axis[1]]++
+    // 새로운 세션 생성
+    if (isSupabaseConnected()) {
+      const newSessionId = await createUserSession()
+      if (newSessionId) {
+        setSessionId(newSessionId)
       }
-    })
-    
-    const resultType = 
-      (axisCounts['E'] > axisCounts['I'] ? 'E' : 'I') +
-      (axisCounts['G'] > axisCounts['C'] ? 'G' : 'C') +
-      (axisCounts['P'] > axisCounts['S'] ? 'P' : 'S') +
-      (axisCounts['T'] > axisCounts['M'] ? 'T' : 'M')
-    
-    return resultType
+    }
   }
 
   // 결과 공유
   const shareResult = async () => {
-    try {
+    if (result) {
       const shareUrl = `${window.location.origin}${window.location.pathname}?result=${result.type}`
-      await navigator.clipboard.writeText(shareUrl)
-      setShareMessage('링크가 복사되었습니다!')
-      setTimeout(() => setShareMessage(''), 3000)
-    } catch (error) {
-      console.error('링크 복사 실패:', error)
-      setShareMessage('링크 복사에 실패했습니다.')
-      setTimeout(() => setShareMessage(''), 3000)
+      
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareMessage('링크가 복사되었습니다!')
+        
+        // 행동 추적
+        if (sessionId && isSupabaseConnected()) {
+          await trackUserAction(sessionId, 'share_clicked', { 
+            shared_result: result.type,
+            share_url: shareUrl
+          })
+        }
+        
+        setTimeout(() => setShareMessage(''), 3000)
+      } catch (error) {
+        console.error('클립보드 복사 실패:', error)
+        setShareMessage('링크 복사에 실패했습니다.')
+        setTimeout(() => setShareMessage(''), 3000)
+      }
     }
   }
 
@@ -562,6 +522,7 @@ function App() {
     </div>
   )
 
+  // 질문 페이지 렌더링
   const renderQuestionPage = () => (
     <div className="question-page">
       <div className="progress-bar">
@@ -597,6 +558,7 @@ function App() {
     </div>
   )
 
+  // 결과 페이지 렌더링
   const renderResultPage = () => (
     <div className="result-page">
       <div className="result-container">
@@ -622,9 +584,55 @@ function App() {
           
           <p className="mbti-description">{result.description}</p>
           
-          {/* 8각형 레이더 차트 */}
+          {/* 4축 가로 막대그래프 */}
           <BarChart answers={answers} />
           
+          {/* 함께하면 좋은 유형 섹션 */}
+          <div className="compatibility-section">
+            <div className="compatibility-title">함께하면 좋은 유형</div>
+            <div className="compatibility-cards">
+              <div className="compatibility-card positive">
+                <div className="card-indicator positive">
+                  <span>✓</span>
+                </div>
+                <div className="card-title">함께하면 좋은 유형 1</div>
+                <div className="character-image">
+                  <div className="character-helmet tryndamere">
+                    <div className="helmet-horns"></div>
+                    <div className="helmet-face">
+                      <div className="helmet-eyes"></div>
+                      <div className="helmet-beard"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="character-subtitle">{result.goodWith.split(', ')[0]}</div>
+                <div className="character-description">
+                  이 유형과 함께하면 시너지가 좋습니다.
+                </div>
+              </div>
+
+              <div className="compatibility-card positive">
+                <div className="card-indicator positive">
+                  <span>✓</span>
+                </div>
+                <div className="card-title">함께하면 좋은 유형 2</div>
+                <div className="character-image">
+                  <div className="character-helmet zed">
+                    <div className="helmet-wings"></div>
+                    <div className="helmet-face">
+                      <div className="helmet-visor"></div>
+                      <div className="helmet-accent"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="character-subtitle">{result.goodWith.split(', ')[1]}</div>
+                <div className="character-description">
+                  이 유형과 함께하면 시너지가 좋습니다.
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="result-details">
             <div className="detail-section">
               <h3>💪 강점</h3>
@@ -635,11 +643,7 @@ function App() {
               <p>{result.weaknesses}</p>
             </div>
             <div className="detail-section">
-              <h3>🎯 대표 챔피언</h3>
-              <p>{result.champions}</p>
-            </div>
-            <div className="detail-section">
-              <h3>🤝 같이 하면 좋은 유형</h3>
+              <h3>🤝 함께하면 좋은 유형</h3>
               <p>{result.goodWith}</p>
             </div>
             <div className="detail-section">
